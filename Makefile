@@ -1,8 +1,4 @@
-.PHONY: up down logs restart setup-dirs ssl-setup firewall-setup down-clean pull build status logs-mongodb logs-redis
-
-# Setup firewall (run with sudo)
-firewall-setup:
-	sudo bash scripts/firewall-setup.sh
+.PHONY: up down logs restart setup-dirs down-clean pull build status logs-mongodb logs-redis
 
 # Create necessary directories
 setup-dirs:
