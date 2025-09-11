@@ -42,16 +42,20 @@ build:
 
 # Create external Docker network from .env
 create-network:
-	@if [ -f .env ]; then \
-		export $(grep -v '^#' .env | xargs); \
-		if [ -z "$$NETWORK_NAME" ]; then \
-			echo "NETWORK_NAME is not set in .env"; exit 1; \
-		fi; \
-		docker network inspect $$NETWORK_NAME >/dev/null 2>&1 || \
-			docker network create --driver bridge $$NETWORK_NAME; \
-		echo "Network $$NETWORK_NAME is ready."; \
+	@if [ ! -f .env ]; then \
+		echo ".env file not found"; \
+		exit 1; \
+	fi
+	@NETWORK_NAME=$$(grep '^NETWORK_NAME=' .env | cut -d'=' -f2); \
+	if [ -z "$$NETWORK_NAME" ]; then \
+		echo "NETWORK_NAME is not set in .env"; \
+		exit 1; \
+	fi; \
+	if ! docker network ls --format "{{.Name}}" | grep -q "^$$NETWORK_NAME$$"; then \
+		docker network create --driver bridge $$NETWORK_NAME; \
+		echo "Network $$NETWORK_NAME created successfully."; \
 	else \
-		echo ".env file not found"; exit 1; \
+		echo "Network $$NETWORK_NAME already exists."; \
 	fi
 
 # Check status
