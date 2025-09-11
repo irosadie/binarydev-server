@@ -1,0 +1,121 @@
+version: '3.9'
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsresolver.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.letsresolver.acme.storage=/letsencrypt/acme.json"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=${NETWORK_NAME}"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--accesslog=true"
+      - "--accesslog.filepath=/logs/access.log"
+      - "--log.level=INFO"
+      - "--log.filepath=/logs/traefik.log"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data/traefik:/letsencrypt
+      - ./logs/traefik:/logs
+    networks:
+      - ${NETWORK_NAME}
+    labels:
+      - "traefik.enable=false"
+
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: always
+    command: >
+      bash -c "
+      mongod --bind_ip_all --replSet rs0 --logpath /var/log/mongodb/mongod.log --fork;
+      echo 'Waiting for MongoDB to start...';
+      until mongosh --quiet --eval 'db.runCommand(\"ping\").ok' > /dev/null 2>&1; do
+        sleep 2;
+      done;
+      echo 'MongoDB is ready, checking replica set...';
+      mongosh --quiet --eval '
+        try {
+          let status = rs.status();
+          if (status.ok) {
+            print(\"Replica set already initialized\");
+          }
+        } catch(e) {
+          if (e.message.includes(\"no replset config has been received\")) {
+            print(\"Initializing replica set...\");
+            rs.initiate({
+              _id: \"rs0\",
+              members: [{
+                _id: 0,
+                host: \"mongodb:27017\",
+                priority: 1
+              }]
+            });
+            sleep(5000);
+            print(\"Replica set initialization completed\");
+          }
+        }
+      ';
+      echo 'Starting log tail...';
+      tail -f /var/log/mongodb/mongod.log
+      "
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+    volumes:
+      - ./data/mongodb:/data/db
+      - ./config/mongodb:/data/configdb
+      - ./logs/mongodb:/var/log/mongodb
+    networks:
+      - ${NETWORK_NAME}
+    ports:
+      - "${DB_PORT}:${DB_PORT}"
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\" --protected-mode yes"]
+    volumes:
+      - ./data/redis:/data
+    networks:
+      - ${NETWORK_NAME}
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+
+networks:
+  kelasjawara:
+    external: true

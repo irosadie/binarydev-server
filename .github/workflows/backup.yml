@@ -1,0 +1,105 @@
+name: Database Backup
+
+on:
+#   schedule:
+#     - cron: '59 16 * * *' # Every day at 16:59 UTC // 23:59 WIB
+  push:
+    branches:
+      - master
+
+jobs:
+  backup-and-cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: Production
+    
+    steps:
+      - name: Setup SSH Connection
+        run: |
+            echo "Setup SSH Connection..."
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            echo "${SSH_PRIVATE_KEY}" > ~/.ssh/key.pem
+            chmod 600 ~/.ssh/key.pem
+            ssh-keyscan ${IP_SERVER} >> ~/.ssh/known_hosts
+            chmod 600 ~/.ssh/known_hosts
+        env:
+            SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+            IP_SERVER: ${{ secrets.IP_SERVER }}
+
+      - name: Test SSH Connection
+        run: |
+            echo "Test SSH Connection..."
+            ssh  -i ~/.ssh/key.pem -o ConnectTimeout=30 \
+                -o ServerAliveInterval=30 \
+                -o ServerAliveCountMax=40 \
+                -o StrictHostKeyChecking=no \
+            ${USER_SERVER}@${IP_SERVER} \
+            "echo 'SSH connection successful'"
+        env:
+            USER_SERVER: ${{ secrets.USER_SERVER }}
+            IP_SERVER: ${{ secrets.IP_SERVER }}
+
+      - name: Setup Tools
+        run: |
+          # Install rclone
+          curl -s https://rclone.org/install.sh | sudo bash
+          mkdir -p ~/.config/rclone
+          echo "${RCLONE_CONFIG}" > ~/.config/rclone/rclone.conf
+        env:
+            RCLONE_CONFIG: ${{ secrets.RCLONE_CONFIG }}
+      
+      - name: Create Backup
+        id: backup
+        run: |
+          echo "🔄 Starting backup process..."
+          DATE=$(date +%Y%m%d_%H%M%S)
+          
+          # Create and upload backup
+          if ssh ${USER_SERVER}@${IP_SERVER} \
+            "docker exec ${DB_CONTAINER_NAME} mongodump \
+                --uri='${DATABASE_URL}' --archive --gzip" | \
+            rclone rcat gdrive:${FOLDER_PATH}/mongo_backup_${DATE}.archive.gz; then
+
+            echo "✅ MongoDB Backup completed: mongo_backup_${DATE}.archive.gz"
+            echo "backup_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Backup failed!"
+            echo "backup_success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        env:
+            USER_SERVER: ${{ secrets.USER_SERVER }}
+            IP_SERVER: ${{ secrets.IP_SERVER }}
+            DB_CONTAINER_NAME: ${{ secrets.DB_CONTAINER_NAME }}
+            DATABASE_URL: ${{ secrets.DATABASE_URL }}
+            FOLDER_PATH: ${{ vars.FOLDER_PATH }}
+      
+      - name: Cleanup Old Backups
+        if: steps.backup.outputs.backup_success == 'true'
+        run: |
+          echo "🧹 Starting cleanup process (backup was successful)..."
+          
+          # Count current backups
+          BACKUP_COUNT=$(rclone lsl gdrive:${FOLDER_PATH}/ | grep "\.archive\.gz$" | wc -l)
+          echo "📊 Current backups: $BACKUP_COUNT"
+          
+          if [ $BACKUP_COUNT -gt 3 ]; then
+            DELETE_COUNT=$((BACKUP_COUNT - 3))
+            echo "🗑️  Need to delete $DELETE_COUNT old backups"
+            
+            # Delete oldest backups (keep only 3)
+            rclone lsl gdrive:${FOLDER_PATH}/ | grep "\.archive\.gz$" | sort -k2,3 | head -n $DELETE_COUNT | while read line; do
+              FILENAME=$(echo "$line" | awk '{print $NF}')
+              echo "Deleting: $FILENAME"
+              rclone delete gdrive:${FOLDER_PATH}/$FILENAME
+            done
+          else
+            echo "✅ No cleanup needed (keeping $BACKUP_COUNT backups)"
+          fi
+          
+          # Show final count
+          FINAL_COUNT=$(rclone lsl gdrive:${FOLDER_PATH}/ | grep "\.archive\.gz$" | wc -l)
+          echo "📋 Final backup count: $FINAL_COUNT"
+        env:
+           FOLDER_PATH: ${{ vars.FOLDER_PATH }}

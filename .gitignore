@@ -1,0 +1,54 @@
+# SSL certificates
+*.pem
+*.crt
+*.key
+*.csr
+
+# Backup files
+backups/
+*.backup
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test files
+test_input.txt
+*.test
+
+# Temporary files
+*.tmp
+*.temp
+
+# Docker
+.docker/
+
+# Node modules (if any)
+node_modules/
+
+# Python cache (if any)
+__pycache__/
+*.pyc
+*.pyo
+
+# Log files
+*.log
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+.env
