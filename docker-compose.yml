@@ -84,7 +84,7 @@ services:
     networks:
       - ${NETWORK_NAME}
     ports:
-      - "${DB_PORT}:${DB_PORT}"
+      - "${MONGO_DB_PORT}:${MONGO_DB_PORT}"
     labels:
       - "traefik.enable=false"
     healthcheck:
