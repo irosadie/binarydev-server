@@ -115,6 +115,26 @@ services:
       timeout: 3s
       retries: 5
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: always
+    ports:
+      - "${QDRANT_PORT}:6333"
+    environment:
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    networks:
+      - ${NETWORK_NAME}
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:6333/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 
 networks:
   binarydev:

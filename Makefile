@@ -1,8 +1,8 @@
-.PHONY: up down logs restart setup-dirs down-clean pull build status logs-mongodb logs-redis
+.PHONY: up down logs restart setup-dirs down-clean pull build status logs-mongodb logs-redis logs-qdrant create-network
 
 # Create necessary directories
 setup-dirs:
-	mkdir -p data/mongodb data/redis logs
+	mkdir -p data/mongodb data/redis data/qdrant logs
 
 # Start all services
 up: setup-dirs
@@ -30,11 +30,12 @@ logs-mongodb:
 logs-redis:
 	docker compose logs -f redis
 
+logs-qdrant:
+	docker compose logs -f qdrant
+
 # Pull latest images
 pull:
 	docker compose pull
-
-	docker compose up -d --build
 
 # Build and start (if you have custom builds)
 build:
