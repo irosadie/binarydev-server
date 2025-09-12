@@ -127,6 +127,12 @@ services:
       - ${NETWORK_NAME}
     labels:
       - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/6333 && echo -e 'GET / HTTP/1.1\\r\\nHost: localhost\\r\\napi-key: ${QDRANT_API_KEY}\\r\\n\\r\\n' >&3 && timeout 5 grep -q '200 OK' <&3"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
 
 networks:
