@@ -36,6 +36,17 @@ fi
 # Load environment variables
 source .env
 
+# Detect Docker Compose command
+if command -v docker-compose >/dev/null 2>&1; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version >/dev/null 2>&1; then
+    DOCKER_COMPOSE="docker compose"
+else
+    print_error "Docker Compose not found. Please install Docker Compose."
+    exit 1
+fi
+print_status "Using Docker Compose command: ${DOCKER_COMPOSE}"
+
 # Check if Docker is running
 print_status "Checking Docker status..."
 if ! docker info > /dev/null 2>&1; then
@@ -73,7 +84,7 @@ if docker ps -q -f name=postgresql >/dev/null 2>&1; then
     print_warning "PostgreSQL container exists, checking for lc_collate issues..."
     if docker logs postgresql 2>&1 | grep -q "unrecognized configuration parameter.*lc_collate"; then
         print_warning "Found lc_collate error, fixing PostgreSQL..."
-        docker compose stop postgresql
+        ${DOCKER_COMPOSE} stop postgresql
         print_status "Removing problematic PostgreSQL data..."
         rm -rf data/postgresql
         mkdir -p data/postgresql
@@ -83,7 +94,7 @@ fi
 
 # Start services
 print_status "Starting all services..."
-docker compose up -d
+${DOCKER_COMPOSE} up -d
 
 # Wait for services to be ready
 print_status "Waiting for services to initialize..."

@@ -1,5 +1,11 @@
 .PHONY: up down logs restart setup-dirs down-clean pull build status logs-mongodb logs-redis logs-qdrant logs-postgresql create-network start
 
+# Detect Docker Compose command
+DOCKER_COMPOSE := $(shell command -v docker-compose 2> /dev/null)
+ifndef DOCKER_COMPOSE
+    DOCKER_COMPOSE := docker compose
+endif
+
 # Start all services with automatic fixes
 start:
 	@chmod +x scripts/start-services.sh
@@ -14,43 +20,43 @@ setup-dirs:
 
 # Start all services (simple)
 up: setup-dirs
-	docker compose up -d
+	$(DOCKER_COMPOSE) up -d
 
 # Stop and remove all services
 down:
-	docker compose down
+	$(DOCKER_COMPOSE) down
 
 # Stop, remove, and clean up volumes (use with caution - deletes data)
 down-clean:
-	docker compose down -v
+	$(DOCKER_COMPOSE) down -v
 
 # Restart all services
 restart:
-	docker compose restart
+	$(DOCKER_COMPOSE) restart
 
 # View logs
 logs:
-	docker compose logs -f
+	$(DOCKER_COMPOSE) logs -f
 
 logs-mongodb:
-	docker compose logs -f mongodb
+	$(DOCKER_COMPOSE) logs -f mongodb
 
 logs-redis:
-	docker compose logs -f redis
+	$(DOCKER_COMPOSE) logs -f redis
 
 logs-qdrant:
-	docker compose logs -f qdrant
+	$(DOCKER_COMPOSE) logs -f qdrant
 
 logs-postgresql:
-	docker compose logs -f postgresql
+	$(DOCKER_COMPOSE) logs -f postgresql
 
 # Pull latest images
 pull:
-	docker compose pull
+	$(DOCKER_COMPOSE) pull
 
 # Build and start (if you have custom builds)
 build:
-	docker compose up -d --build
+	$(DOCKER_COMPOSE) up -d --build
 
 # Create external Docker network from .env
 create-network:
@@ -72,4 +78,4 @@ create-network:
 
 # Check status
 status:
-	docker compose ps
+	$(DOCKER_COMPOSE) ps
