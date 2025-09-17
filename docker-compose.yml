@@ -145,6 +145,8 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - PGDATA=/var/lib/postgresql/data/pgdata
+      - LANG=en_US.UTF-8
+      - LC_ALL=en_US.UTF-8
     volumes:
       - ./data/postgresql:/var/lib/postgresql/data
     networks:

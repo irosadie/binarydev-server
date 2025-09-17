@@ -76,6 +76,8 @@ if command -v ufw >/dev/null 2>&1; then
     sudo ufw allow 443/tcp >/dev/null 2>&1   # HTTPS
     sudo ufw allow 8080/tcp >/dev/null 2>&1  # Traefik Dashboard
     print_success "Firewall configured"
+elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    print_warning "Detected Linux, but ufw not found. Please ensure firewall allows the required ports."
 fi
 
 # PostgreSQL Fix for lc_collate error
