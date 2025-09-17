@@ -9,43 +9,43 @@ setup-dirs:
 
 # Start all services
 up: setup-dirs
-	docker-compose up -d
+	docker compose up -d
 
 # Stop and remove all services
 down:
-	docker-compose down
+	docker compose down
 
 # Stop, remove, and clean up volumes (use with caution - deletes data)
 down-clean:
-	docker-compose down -v
+	docker compose down -v
 
 # Restart all services
 restart:
-	docker-compose restart
+	docker compose restart
 
 # View logs
 logs:
-	docker-compose logs -f
+	docker compose logs -f
 
 logs-mongodb:
-	docker-compose logs -f mongodb
+	docker compose logs -f mongodb
 
 logs-redis:
-	docker-compose logs -f redis
+	docker compose logs -f redis
 
 logs-qdrant:
-	docker-compose logs -f qdrant
+	docker compose logs -f qdrant
 
 logs-postgresql:
-	docker-compose logs -f postgresql
+	docker compose logs -f postgresql
 
 # Pull latest images
 pull:
-	docker-compose pull
+	docker compose pull
 
 # Build and start (if you have custom builds)
 build:
-	docker-compose up -d --build
+	docker compose up -d --build
 
 # Create external Docker network from .env
 create-network:
@@ -67,4 +67,4 @@ create-network:
 
 # Check status
 status:
-	docker-compose ps
+	docker compose ps
