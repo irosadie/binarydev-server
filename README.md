@@ -42,12 +42,27 @@ POSTGRES_DB=binarydb
 POSTGRES_USER=binarydev
 POSTGRES_PASSWORD=5ayagantenG
 POSTGRES_PORT=5432
+
+# PostgreSQL Secondary Database (optional)
+POSTGRES_DB_SECONDARY=binarydb_test
 ```
 
 ### 3. Start Services
+
+#### Recommended (with auto-fix):
 ```bash
-# Start all services
+# Start with automatic PostgreSQL fixes
+make start
+```
+
+#### Simple start:
+```bash
+# Start all services (basic)
 make up
+
+# Check status
+make status
+```
 
 # Check status
 make status

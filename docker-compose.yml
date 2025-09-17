@@ -139,15 +139,12 @@ services:
     container_name: postgresql
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "0.0.0.0:${POSTGRES_PORT}:5432"
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8
       - PGDATA=/var/lib/postgresql/data/pgdata
-      - LC_ALL=en_US.UTF-8
-      - LANG=en_US.UTF-8
     volumes:
       - ./data/postgresql:/var/lib/postgresql/data
     networks:
@@ -162,14 +159,12 @@ services:
       start_period: 30s
     command: >
       postgres 
+      -c listen_addresses='*'
       -c log_destination=stderr 
       -c log_statement=all
-      -c listen_addresses=*
       -c max_connections=200
       -c shared_buffers=256MB
       -c effective_cache_size=1GB
-      -c log_timezone=UTC
-      -c timezone=UTC
 
   
 networks:

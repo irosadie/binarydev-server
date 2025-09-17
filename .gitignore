@@ -51,6 +51,17 @@ __pycache__/
 *.tar.gz
 *.rar
 
+# Docker data and logs (exclude from git)
 .env
+data/
+logs/
 
-data
+# But keep directory structure
+!data/.gitkeep
+!logs/.gitkeep
+!config/
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
