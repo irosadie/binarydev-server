@@ -75,9 +75,14 @@ if command -v ufw >/dev/null 2>&1; then
     sudo ufw allow 80/tcp >/dev/null 2>&1    # HTTP
     sudo ufw allow 443/tcp >/dev/null 2>&1   # HTTPS
     sudo ufw allow 8080/tcp >/dev/null 2>&1  # Traefik Dashboard
-    print_success "Firewall configured"
+    print_success "Firewall configured for Ubuntu"
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    print_warning "Detected Linux, but ufw not found. Please ensure firewall allows the required ports."
+    print_warning "Detected Linux, but ufw not found. Please ensure firewall allows the required ports:"
+    print_warning "  - PostgreSQL: 5432/tcp"
+    print_warning "  - MongoDB: 27017/tcp"
+    print_warning "  - Redis: 6379/tcp"
+    print_warning "  - Qdrant: 6333/tcp"
+    print_warning "  - HTTP: 80/tcp, HTTPS: 443/tcp, Traefik: 8080/tcp"
 fi
 
 # PostgreSQL Fix for lc_collate error
@@ -147,11 +152,18 @@ echo "   - PostgreSQL logs: make logs-postgresql"
 echo "   - Stop services: make down"
 
 # Show PostgreSQL connection info for external access
-SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
+SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}' 2>/dev/null || echo "YOUR_SERVER_IP")
 echo ""
-print_status "🔗 External access (pgAdmin):"
+print_status "🔗 External access (pgAdmin/DBeaver):"
 echo "   Host: ${SERVER_IP}"
 echo "   Port: ${POSTGRES_PORT}"
 echo "   Database: ${POSTGRES_DB}"
 echo "   Username: ${POSTGRES_USER}"
 echo "   Password: ${POSTGRES_PASSWORD}"
+echo ""
+print_status "🔧 Troubleshooting commands:"
+echo "   - Check PostgreSQL logs: docker logs postgresql"
+echo "   - Test connection: docker exec postgresql psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'SELECT version();'"
+echo "   - Check firewall: sudo ufw status"
+echo "   - Check Docker networks: docker network ls"
+echo "   - Test port: nc -zv ${SERVER_IP} ${POSTGRES_PORT}"

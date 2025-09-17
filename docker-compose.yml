@@ -121,6 +121,7 @@ services:
       - "${QDRANT_PORT}:6333"
     environment:
       - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+      - QDRANT__STORAGE__PERFORM_CHECKS=false
     volumes:
       - ./data/qdrant:/qdrant/storage
     networks:
@@ -149,6 +150,7 @@ services:
       - LC_ALL=en_US.UTF-8
     volumes:
       - ./data/postgresql:/var/lib/postgresql/data
+      - ./config/postgresql:/etc/postgresql
     networks:
       - ${NETWORK_NAME}
     labels:
@@ -167,6 +169,8 @@ services:
       -c max_connections=200
       -c shared_buffers=256MB
       -c effective_cache_size=1GB
+      -c hba_file=/etc/postgresql/pg_hba.conf
+      -c config_file=/etc/postgresql/postgresql.conf
 
   
 networks:
