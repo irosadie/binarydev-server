@@ -73,7 +73,7 @@ if docker ps -q -f name=postgresql >/dev/null 2>&1; then
     print_warning "PostgreSQL container exists, checking for lc_collate issues..."
     if docker logs postgresql 2>&1 | grep -q "unrecognized configuration parameter.*lc_collate"; then
         print_warning "Found lc_collate error, fixing PostgreSQL..."
-        docker-compose stop postgresql
+        docker compose stop postgresql
         print_status "Removing problematic PostgreSQL data..."
         rm -rf data/postgresql
         mkdir -p data/postgresql
@@ -83,7 +83,7 @@ fi
 
 # Start services
 print_status "Starting all services..."
-docker-compose up -d
+docker compose up -d
 
 # Wait for services to be ready
 print_status "Waiting for services to initialize..."
