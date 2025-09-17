@@ -1,12 +1,36 @@
+# Environment files
+.env
+.env.local
+.env.production
+
+# Data directories (keep structure, ignore data)
+data/mongodb/
+data/postgresql/
+data/redis/
+data/qdrant/
+data/traefik/
+!data/.gitkeep
+!data/*/.gitkeep
+
+# Log files
+logs/mongodb/
+logs/traefik/
+!logs/.gitkeep
+!logs/*/.gitkeep
+*.log
+
 # SSL certificates
 *.pem
 *.crt
 *.key
 *.csr
+acme.json
 
 # Backup files
 backups/
 *.backup
+*.sql.gz
+*.dump
 
 # OS generated files
 .DS_Store
@@ -34,6 +58,7 @@ test_input.txt
 
 # Docker
 .docker/
+docker-data/
 
 # Node modules (if any)
 node_modules/
@@ -43,11 +68,9 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Log files
-*.log
-
 # Archives
 *.zip
+*.tar.gz
 *.tar.gz
 *.rar
 

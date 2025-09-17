@@ -1,53 +1,374 @@
-# BinaryDev Server Stack
+# BinaryDev Server Infrastructure
 
-Complete docker-compose stack untuk BinaryDev dengan MongoDB, Redis, dan Qdrant Vector Database.
+Production-ready Docker infrastructure stack untuk development dan production dengan PostgreSQL, MongoDB, Redis, Qdrant Vector Database, dan Traefik reverse proxy.
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Setup
+### Prerequisites
+- Docker & Docker Compose
+- macOS (development) / Ubuntu Server (production)
+- Minimum 4GB RAM, 20GB disk space
+
+### Development Setup
+
 ```bash
-# Clone repository
+# 1. Clone repository
 git clone https://github.com/irosadie/binarydev-server.git
 cd binarydev-server
 
-# Create network
-make create-network
+# 2. Copy environment file
+cp .env.example .env
 
-# Setup directories
-make setup-dirs
+# 3. Start all services
+make start
 ```
 
-### 2. Environment
-Edit file `.env` sesuai kebutuhan:
-```bash
-NETWORK_NAME=binarydev
-SSL_EMAIL=hi@binarydev.co.id
+### Production Setup
 
-# MongoDB
+```bash
+# 1. Clone repository
+git clone https://github.com/irosadie/binarydev-server.git
+cd binarydev-server
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env dengan konfigurasi production yang aman
+
+# 3. Setup firewall (Ubuntu)
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 5432/tcp  # PostgreSQL (jika perlu remote access)
+sudo ufw allow 27017/tcp # MongoDB (jika perlu remote access)
+
+# 4. Start services
+make start
+```
+
+## 📋 Services Overview
+
+| Service    | Port | Description                    | Health Check |
+|------------|------|--------------------------------|--------------|
+| PostgreSQL | 5432 | Primary relational database    | ✅ Healthy   |
+| MongoDB    | 27017| NoSQL document database        | ✅ Healthy   |
+| Redis      | 6379 | In-memory cache & session store| ✅ Healthy   |
+| Qdrant     | 6333 | Vector database for AI/ML      | ⚠️ API Key   |
+| Traefik    | 8080 | Reverse proxy & load balancer  | ⚠️ Config    |
+
+## 🔧 Configuration
+
+### Environment Variables (.env)
+
+```bash
+# Network
+NETWORK_NAME=binarydev
+SSL_EMAIL=admin@yourdomain.com
+
+# PostgreSQL - Production Database
+POSTGRES_DB=binarydb
+POSTGRES_USER=binarydev
+POSTGRES_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
+POSTGRES_PORT=5432
+
+# MongoDB - Document Database
 MONGO_INITDB_ROOT_USERNAME=binarydev
-MONGO_INITDB_ROOT_PASSWORD=5ayagantenG
+MONGO_INITDB_ROOT_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
 MONGO_INITDB_DATABASE=binarydb
 MONGO_DB_PORT=27017
 
-# Redis
-REDIS_PASSWORD=5ayagantenG
+# Redis - Cache & Sessions
+REDIS_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
 REDIS_PORT=6379
 
-# Qdrant Vector Database
+# Qdrant - Vector Database
 QDRANT_PORT=6333
-QDRANT_API_KEY=binarydev_qdrant_key
-
-# PostgreSQL
-POSTGRES_DB=binarydb
-POSTGRES_USER=binarydev
-POSTGRES_PASSWORD=5ayagantenG
-POSTGRES_PORT=5432
-
-# PostgreSQL Secondary Database (optional)
-POSTGRES_DB_SECONDARY=binarydb_test
+QDRANT_API_KEY=CHANGE_THIS_API_KEY
 ```
 
-### 3. Start Services
+### Database Credentials
+
+**PostgreSQL (Production Ready)**
+- Host: `localhost` atau `your-server-ip`
+- Port: `5432`
+- Database: `binarydb`
+- Username: `binarydev`
+- Password: Sesuai .env
+
+**MongoDB (Document Store)**
+- Host: `localhost` atau `your-server-ip`
+- Port: `27017`
+- Database: `binarydb`
+- Username: `binarydev`
+- Password: Sesuai .env
+
+**Redis (Cache)**
+- Host: `localhost` atau `your-server-ip`
+- Port: `6379`
+- Password: Sesuai .env
+
+**Qdrant (Vector DB)**
+- Host: `localhost` atau `your-server-ip`
+- Port: `6333`
+- API Key: Sesuai .env
+
+## 🛠️ Management Commands
+
+```bash
+# Start all services
+make start
+
+# Stop all services
+make down
+
+# View logs
+make logs
+make logs-postgresql
+make logs-mongodb
+
+# Check status
+make status
+
+# Clean restart (removes all data)
+make down-clean
+make start
+```
+
+## 🔍 Health Checks & Monitoring
+
+### Built-in Health Checks
+
+Semua services memiliki health checks built-in:
+
+```bash
+# Check service status
+docker-compose ps
+
+# Test database connections
+docker exec postgresql psql -U binarydev -d binarydb -c "SELECT version();"
+docker exec mongodb mongosh --quiet --eval "db.runCommand('ping').ok"
+docker exec redis redis-cli -a $REDIS_PASSWORD ping
+```
+
+### Manual Testing
+
+```bash
+# PostgreSQL
+psql -h localhost -U binarydev -d binarydb
+
+# MongoDB
+mongosh mongodb://binarydev:password@localhost:27017/binarydb
+
+# Redis
+redis-cli -h localhost -p 6379 -a password
+
+# Qdrant
+curl -H "api-key: your_api_key" http://localhost:6333/health
+```
+
+## 🔒 Security Features
+
+### Production Security
+
+1. **Password Protection**: Semua databases memiliki authentication
+2. **Network Isolation**: Services dalam isolated Docker network
+3. **Configuration Security**: Sensitive data dalam .env file
+4. **File Permissions**: Proper permissions untuk config files
+5. **Remote Access Control**: pg_hba.conf dikonfigurasi untuk remote access
+
+### Remote Database Access
+
+**PostgreSQL Remote Access:**
+```bash
+# Connection string
+postgresql://binarydev:password@your-server-ip:5432/binarydb
+
+# pgAdmin/DBeaver configuration
+Host: your-server-ip
+Port: 5432
+Database: binarydb
+Username: binarydev
+Password: your-password
+```
+
+**MongoDB Remote Access:**
+```bash
+# Connection string
+mongodb://binarydev:password@your-server-ip:27017/binarydb
+
+# MongoDB Compass configuration
+Host: your-server-ip
+Port: 27017
+Authentication: Username/Password
+Username: binarydev
+Password: your-password
+Database: binarydb
+```
+
+## 📂 Directory Structure
+
+```
+binary-server/
+├── config/
+│   ├── mongodb/            # MongoDB configuration
+│   │   └── mongodb-keyfile # Replica set key (if needed)
+│   └── postgresql/         # PostgreSQL configuration
+│       ├── init.sql        # Database initialization
+│       ├── pg_hba.conf     # Access control
+│       └── postgresql.conf # Server configuration
+├── data/                   # Persistent data (auto-created)
+│   ├── mongodb/
+│   ├── postgresql/
+│   ├── redis/
+│   ├── qdrant/
+│   └── traefik/
+├── logs/                   # Service logs (auto-created)
+│   ├── mongodb/
+│   └── traefik/
+├── scripts/
+│   └── start-services.sh   # Enhanced startup script
+├── docker-compose.yml      # Main orchestration file
+├── Makefile               # Management commands
+└── .env                   # Environment configuration
+```
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**PostgreSQL Connection Issues:**
+```bash
+# Check logs
+make logs-postgresql
+
+# Test connection
+docker exec postgresql pg_isready -U binarydev -d binarydb
+
+# Reset if needed
+make down
+rm -rf data/postgresql/*
+make start
+```
+
+**MongoDB Connection Issues:**
+```bash
+# Check logs
+docker logs mongodb
+
+# Test connection
+docker exec mongodb mongosh --quiet --eval "db.runCommand('ping').ok"
+```
+
+**Network Issues:**
+```bash
+# Check Docker network
+docker network ls
+docker network inspect binarydev
+
+# Recreate network
+make down
+docker network rm binarydev
+make start
+```
+
+### Performance Optimization
+
+**PostgreSQL Tuning:**
+- shared_buffers: 25% of RAM
+- effective_cache_size: 75% of RAM
+- work_mem: 4MB (default sudah optimized)
+
+**MongoDB Tuning:**
+- Gunakan replica set untuk production
+- Enable sharding untuk data besar
+
+**Redis Tuning:**
+- Persistent storage dengan AOF enabled
+- Memory management sudah dikonfigurasi
+
+## 🔄 Backup & Recovery
+
+### Database Backups
+
+**PostgreSQL:**
+```bash
+# Backup
+docker exec postgresql pg_dump -U binarydev binarydb > backup.sql
+
+# Restore
+cat backup.sql | docker exec -i postgresql psql -U binarydev -d binarydb
+```
+
+**MongoDB:**
+```bash
+# Backup
+docker exec mongodb mongodump --db binarydb --out /data/backup
+
+# Restore
+docker exec mongodb mongorestore --db binarydb /data/backup/binarydb
+```
+
+## 📈 Production Deployment
+
+### Ubuntu Server Setup
+
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Install Docker Compose
+sudo apt install docker-compose-plugin
+
+# Clone and setup
+git clone https://github.com/irosadie/binarydev-server.git
+cd binarydev-server
+cp .env.example .env
+
+# Edit .env untuk production
+nano .env
+
+# Start services
+make start
+```
+
+### SSL/TLS dengan Traefik
+
+Traefik sudah dikonfigurasi untuk automatic SSL certificates dengan Let's Encrypt:
+
+1. Update `.env` dengan email valid untuk SSL
+2. Pastikan domain pointing ke server IP
+3. Traefik akan automatic generate SSL certificates
+
+## 📝 Changelog
+
+### v1.0.0 (Current)
+- ✅ PostgreSQL 16 dengan remote access
+- ✅ MongoDB 7 standalone (production ready)
+- ✅ Redis 7 dengan persistence
+- ✅ Qdrant vector database
+- ✅ Traefik v3.0 reverse proxy
+- ✅ Comprehensive health checks
+- ✅ Production-ready security
+- ✅ Cross-platform compatibility (macOS/Linux)
+
+## 🤝 Contributing
+
+1. Fork repository
+2. Create feature branch
+3. Make changes
+4. Test thoroughly
+5. Submit pull request
+
+## 📞 Support
+
+- GitHub Issues: [Create Issue](https://github.com/irosadie/binarydev-server/issues)
+- Email: support@binarydev.co.id
+
+---
+
+**BinaryDev Server Infrastructure** - Production-ready, secure, dan scalable database stack untuk modern applications.
 
 #### Recommended (with auto-fix):
 ```bash

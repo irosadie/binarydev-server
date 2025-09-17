@@ -1,8 +1,8 @@
 services:
   traefik:
-    image: traefik:v2.10
+    image: traefik:v3.0
     container_name: traefik
-    restart: always
+    restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
@@ -14,11 +14,11 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.letsresolver.acme.httpchallenge=true"
       - "--certificatesresolvers.letsresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsresolver.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.letsresolver.acme.email=${SSL_EMAIL:-admin@example.com}"
       - "--certificatesresolvers.letsresolver.acme.storage=/letsencrypt/acme.json"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=${NETWORK_NAME}"
+      - "--providers.docker.network=${NETWORK_NAME:-binarydev}"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--accesslog=true"
@@ -30,59 +30,31 @@ services:
       - ./data/traefik:/letsencrypt
       - ./logs/traefik:/logs
     networks:
-      - ${NETWORK_NAME}
+      - ${NETWORK_NAME:-binarydev}
     labels:
       - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   mongodb:
     image: mongo:7
     container_name: mongodb
-    restart: always
-    command: >
-      bash -c "
-      mongod --bind_ip_all --replSet rs0 --logpath /var/log/mongodb/mongod.log --fork;
-      echo 'Waiting for MongoDB to start...';
-      until mongosh --quiet --eval 'db.runCommand(\"ping\").ok' > /dev/null 2>&1; do
-        sleep 2;
-      done;
-      echo 'MongoDB is ready, checking replica set...';
-      mongosh --quiet --eval '
-        try {
-          let status = rs.status();
-          if (status.ok) {
-            print(\"Replica set already initialized\");
-          }
-        } catch(e) {
-          if (e.message.includes(\"no replset config has been received\")) {
-            print(\"Initializing replica set...\");
-            rs.initiate({
-              _id: \"rs0\",
-              members: [{
-                _id: 0,
-                host: \"mongodb:27017\",
-                priority: 1
-              }]
-            });
-            sleep(5000);
-            print(\"Replica set initialization completed\");
-          }
-        }
-      ';
-      echo 'Starting log tail...';
-      tail -f /var/log/mongodb/mongod.log
-      "
+    restart: unless-stopped
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-binarydev}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-binarydb}
     volumes:
       - ./data/mongodb:/data/db
       - ./config/mongodb:/data/configdb
       - ./logs/mongodb:/var/log/mongodb
     networks:
-      - ${NETWORK_NAME}
+      - ${NETWORK_NAME:-binarydev}
     ports:
-      - "${MONGO_DB_PORT}:27017"
+      - "${MONGO_DB_PORT:-27017}:27017"
     labels:
       - "traefik.enable=false"
     healthcheck:
@@ -95,20 +67,20 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
-    restart: always
+    restart: unless-stopped
     ports:
-      - "${REDIS_PORT}:6379"
+      - "${REDIS_PORT:-6379}:6379"
     environment:
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\" --protected-mode yes"]
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-password}
+    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\" --bind 0.0.0.0 --protected-mode yes"]
     volumes:
       - ./data/redis:/data
     networks:
-      - ${NETWORK_NAME}
+      - ${NETWORK_NAME:-binarydev}
     labels:
       - "traefik.enable=false"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-password}", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -116,43 +88,46 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
-    restart: always
+    restart: unless-stopped
     ports:
-      - "${QDRANT_PORT}:6333"
+      - "${QDRANT_PORT:-6333}:6333"
     environment:
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-default_api_key}
       - QDRANT__STORAGE__PERFORM_CHECKS=false
     volumes:
       - ./data/qdrant:/qdrant/storage
     networks:
-      - ${NETWORK_NAME}
+      - ${NETWORK_NAME:-binarydev}
     labels:
       - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgresql:
     image: postgres:16
     container_name: postgresql
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-binarydb}
+      - POSTGRES_USER=${POSTGRES_USER:-binarydev}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
       - PGDATA=/var/lib/postgresql/data/pgdata
-      - POSTGRES_HOST_AUTH_METHOD=md5
-      - POSTGRES_INITDB_ARGS="--auth-host=md5 --auth-local=trust"
     volumes:
       - ./data/postgresql:/var/lib/postgresql/data
       - ./config/postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./config/postgresql/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./config/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     networks:
-      - ${NETWORK_NAME}
+      - ${NETWORK_NAME:-binarydev}
     labels:
       - "traefik.enable=false"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-binarydev} -d ${POSTGRES_DB:-binarydb} -h localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -161,10 +136,8 @@ services:
       postgres 
       -c listen_addresses='*'
       -c port=5432
-      -c log_destination='stderr,csvlog'
-      -c logging_collector=on
-      -c log_directory='/var/log/postgresql'
-      -c log_filename='postgresql-%Y-%m-%d_%H%M%S.log'
+      -c log_destination='stderr'
+      -c logging_collector=off
       -c log_statement=none
       -c log_min_messages=warning
       -c max_connections=200
@@ -177,9 +150,8 @@ services:
       -c default_statistics_target=100
       -c random_page_cost=1.1
       -c effective_io_concurrency=200
-      -c hba_file=/etc/postgresql/pg_hba.conf
-      -c config_file=/etc/postgresql/postgresql.conf
 
 networks:
   binarydev:
-    external: true
+    name: ${NETWORK_NAME:-binarydev}
+    driver: bridge
