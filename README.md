@@ -36,6 +36,12 @@ REDIS_PORT=6379
 # Qdrant Vector Database
 QDRANT_PORT=6333
 QDRANT_API_KEY=binarydev_qdrant_key
+
+# PostgreSQL
+POSTGRES_DB=binarydb
+POSTGRES_USER=binarydev
+POSTGRES_PASSWORD=5ayagantenG
+POSTGRES_PORT=5432
 ```
 
 ### 3. Start Services
@@ -69,6 +75,12 @@ make status
 - **Features**: API key authentication, persistent storage
 - **Authentication**: API key dari .env
 
+### 🐘 PostgreSQL
+- **Port**: 5432
+- **Features**: Full SQL database, remote access support
+- **Authentication**: Username/password dari .env
+- **Remote Access**: Dapat diakses dari pgAdmin client external
+
 ## Make Commands
 
 ### Basic Operations
@@ -82,9 +94,10 @@ make logs         # View all logs
 
 ### Service-specific Commands
 ```bash
-make logs-mongodb # MongoDB logs
-make logs-redis   # Redis logs
-make logs-qdrant  # Qdrant logs
+make logs-mongodb    # MongoDB logs
+make logs-redis      # Redis logs
+make logs-qdrant     # Qdrant logs
+make logs-postgresql # PostgreSQL logs
 ```
 
 ### Utilities
@@ -144,13 +157,69 @@ curl -X POST "http://localhost:6333/collections/my_collection/points/search" \
   }'
 ```
 
+## PostgreSQL Database
+
+### Connection Details
+- **Host**: localhost (atau IP server)
+- **Port**: 5432 (default, dapat diubah di .env)
+- **Database**: binarydb (sesuai POSTGRES_DB di .env)
+- **Username**: binarydev (sesuai POSTGRES_USER di .env)
+- **Password**: 5ayagantenG (sesuai POSTGRES_PASSWORD di .env)
+
+### Connecting with pgAdmin
+1. Buka pgAdmin di client
+2. Add New Server:
+   - **Name**: BinaryDev PostgreSQL
+   - **Host**: IP address server (atau localhost jika lokal)
+   - **Port**: 5432
+   - **Username**: binarydev
+   - **Password**: 5ayagantenG
+   - **Database**: binarydb
+
+### Command Line Access
+```bash
+# Connect via psql (dari dalam container)
+docker exec -it postgresql psql -U binarydev -d binarydb
+
+# Connect via psql (dari host jika psql terinstall)
+psql -h localhost -p 5432 -U binarydev -d binarydb
+```
+
+### Database Operations
+```sql
+-- Create table example
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert data
+INSERT INTO users (username, email) VALUES ('johndoe', 'john@example.com');
+
+-- Query data
+SELECT * FROM users;
+```
+
+### Backup & Restore
+```bash
+# Backup database
+docker exec postgresql pg_dump -U binarydev binarydb > backup.sql
+
+# Restore database
+docker exec -i postgresql psql -U binarydev binarydb < backup.sql
+```
+
 ## Directory Structure
 ```
 ├── data/
 │   ├── mongodb/     # MongoDB data
 │   ├── redis/       # Redis data
-│   └── qdrant/      # Qdrant storage
+│   ├── qdrant/      # Qdrant storage
+│   └── postgresql/  # PostgreSQL data
 ├── logs/            # Service logs
+│   └── postgresql/  # PostgreSQL logs
 ├── scripts/         # Utility scripts
 ├── docker-compose.yml
 ├── Makefile
@@ -175,6 +244,12 @@ curl -X POST "http://localhost:6333/collections/my_collection/points/search" \
 - ✅ Protected mode
 - ✅ Persistence enabled
 
+### PostgreSQL
+- ✅ Username/password authentication
+- ✅ Network isolation
+- ✅ Remote access support
+- ✅ Query logging enabled
+
 ### Traefik
 - ✅ SSL certificates (Let's Encrypt)
 - ✅ Access logs
@@ -189,10 +264,11 @@ make status
 
 ### View Logs
 ```bash
-make logs           # All services
-make logs-qdrant    # Qdrant only
-make logs-mongodb   # MongoDB only
-make logs-redis     # Redis only
+make logs              # All services
+make logs-qdrant       # Qdrant only
+make logs-mongodb      # MongoDB only
+make logs-redis        # Redis only
+make logs-postgresql   # PostgreSQL only
 ```
 
 ### Common Issues

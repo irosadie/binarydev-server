@@ -1,8 +1,8 @@
-.PHONY: up down logs restart setup-dirs down-clean pull build status logs-mongodb logs-redis logs-qdrant create-network
+.PHONY: up down logs restart setup-dirs down-clean pull build status logs-mongodb logs-redis logs-qdrant logs-postgresql create-network
 
 # Create necessary directories
 setup-dirs:
-	mkdir -p data/mongodb data/redis data/qdrant logs
+	mkdir -p data/mongodb data/redis data/qdrant data/postgresql logs logs/postgresql
 
 # Start all services
 up: setup-dirs
@@ -32,6 +32,9 @@ logs-redis:
 
 logs-qdrant:
 	docker compose logs -f qdrant
+
+logs-postgresql:
+	docker compose logs -f postgresql
 
 # Pull latest images
 pull:

@@ -134,7 +134,40 @@ services:
       retries: 3
       start_period: 30s
 
+  postgresql:
+    image: postgres:16-alpine
+    container_name: postgresql
+    restart: always
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgresql:/var/lib/postgresql/data
+      - ./logs/postgresql:/var/log/postgresql
+    networks:
+      - ${NETWORK_NAME}
+    labels:
+      - "traefik.enable=false"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      postgres 
+      -c log_destination=stderr 
+      -c logging_collector=on 
+      -c log_directory=/var/log/postgresql 
+      -c log_filename=postgresql.log 
+      -c log_statement=all
+      -c listen_addresses=*
 
+  
 networks:
   binarydev:
     external: true
