@@ -82,7 +82,7 @@ services:
     networks:
       - ${NETWORK_NAME}
     ports:
-      - "${MONGO_DB_PORT}:${MONGO_DB_PORT}"
+      - "${MONGO_DB_PORT}:27017"
     labels:
       - "traefik.enable=false"
     healthcheck:
@@ -97,7 +97,7 @@ services:
     container_name: redis
     restart: always
     ports:
-      - "${REDIS_PORT}:${REDIS_PORT}"
+      - "${REDIS_PORT}:6379"
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\" --protected-mode yes"]
@@ -128,51 +128,58 @@ services:
       - ${NETWORK_NAME}
     labels:
       - "traefik.enable=false"
-    healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/6333 && echo -e 'GET / HTTP/1.1\\r\\nHost: localhost\\r\\napi-key: ${QDRANT_API_KEY}\\r\\n\\r\\n' >&3 && timeout 5 grep -q '200 OK' <&3"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
 
   postgresql:
     image: postgres:16
     container_name: postgresql
     restart: unless-stopped
     ports:
-      - "0.0.0.0:${POSTGRES_PORT}:5432"
+      - "${POSTGRES_PORT}:5432"
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - PGDATA=/var/lib/postgresql/data/pgdata
-      - LANG=en_US.UTF-8
-      - LC_ALL=en_US.UTF-8
+      - POSTGRES_HOST_AUTH_METHOD=md5
+      - POSTGRES_INITDB_ARGS="--auth-host=md5 --auth-local=trust"
     volumes:
       - ./data/postgresql:/var/lib/postgresql/data
-      - ./config/postgresql:/etc/postgresql
+      - ./config/postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./config/postgresql/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./config/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     networks:
       - ${NETWORK_NAME}
     labels:
       - "traefik.enable=false"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} -h localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     command: >
       postgres 
       -c listen_addresses='*'
-      -c log_destination=stderr 
-      -c log_statement=all
+      -c port=5432
+      -c log_destination='stderr,csvlog'
+      -c logging_collector=on
+      -c log_directory='/var/log/postgresql'
+      -c log_filename='postgresql-%Y-%m-%d_%H%M%S.log'
+      -c log_statement=none
+      -c log_min_messages=warning
       -c max_connections=200
       -c shared_buffers=256MB
       -c effective_cache_size=1GB
+      -c work_mem=4MB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
       -c hba_file=/etc/postgresql/pg_hba.conf
       -c config_file=/etc/postgresql/postgresql.conf
 
-  
 networks:
   binarydev:
     external: true

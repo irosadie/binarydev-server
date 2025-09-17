@@ -65,6 +65,13 @@ mkdir -p data/{mongodb,redis,qdrant,postgresql}
 mkdir -p logs
 print_success "Directories created"
 
+# Set proper permissions for PostgreSQL configuration files
+print_status "Setting PostgreSQL configuration permissions..."
+chmod 600 config/postgresql/pg_hba.conf 2>/dev/null || print_warning "pg_hba.conf not found"
+chmod 600 config/postgresql/postgresql.conf 2>/dev/null || print_warning "postgresql.conf not found"
+chmod 644 config/postgresql/init.sql 2>/dev/null || print_warning "init.sql not found"
+print_success "PostgreSQL configuration permissions set"
+
 # Check if we're on Ubuntu and setup firewall
 if command -v ufw >/dev/null 2>&1; then
     print_status "Setting up Ubuntu firewall..."
