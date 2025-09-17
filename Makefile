@@ -1,51 +1,84 @@
-.PHONY: up down logs restart setup-dirs down-clean pull build status logs-mongodb logs-redis logs-qdrant logs-postgresql create-network
+.PHONY: up down logs restart setup-dirs down-clean pull build status logs-mongodb logs-redis logs-qdrant logs-postgresql create-network setup-ubuntu setup-firewall-ubuntu
+
+# Detect OS
+UNAME := $(shell uname)
+
+# Detect Docker Compose command
+DOCKER_COMPOSE := $(shell command -v docker-compose 2> /dev/null || echo "docker compose")
 
 # Create necessary directories
 setup-dirs:
 	@echo "Creating necessary directories..."
 	@mkdir -p data/mongodb data/redis data/qdrant data/postgresql
 	@mkdir -p logs
+ifeq ($(UNAME), Linux)
+	@echo "Setting Linux permissions..."
+	@chmod -R 755 data/ logs/
+	@chown -R $(USER):$(USER) data/ logs/ 2>/dev/null || true
+endif
 	@echo "Directories created successfully!"
+
+# Ubuntu specific setup
+setup-ubuntu:
+	@echo "Running Ubuntu setup script..."
+	@./setup-ubuntu.sh
+
+# Ubuntu firewall setup
+setup-firewall-ubuntu:
+	@echo "Setting up Ubuntu firewall for database ports..."
+	@sudo ufw allow 5432/tcp comment "PostgreSQL"
+	@sudo ufw allow 27017/tcp comment "MongoDB"
+	@sudo ufw allow 6379/tcp comment "Redis"
+	@sudo ufw allow 6333/tcp comment "Qdrant"
+	@sudo ufw allow 80/tcp comment "HTTP"
+	@sudo ufw allow 443/tcp comment "HTTPS"
+	@sudo ufw allow 8080/tcp comment "Traefik Dashboard"
+	@echo "Firewall rules added successfully!"
 
 # Start all services
 up: setup-dirs
-	docker compose up -d
+	$(DOCKER_COMPOSE) up -d
 
 # Stop and remove all services
 down:
-	docker compose down
+	$(DOCKER_COMPOSE) down
 
 # Stop, remove, and clean up volumes (use with caution - deletes data)
 down-clean:
-	docker compose down -v
+	$(DOCKER_COMPOSE) down -v
+ifeq ($(UNAME), Linux)
+	@sudo rm -rf data/ logs/ 2>/dev/null || rm -rf data/ logs/
+else
+	@rm -rf data/ logs/
+endif
 
 # Restart all services
 restart:
-	docker compose restart
+	$(DOCKER_COMPOSE) restart
 
 # View logs
 logs:
-	docker compose logs -f
+	$(DOCKER_COMPOSE) logs -f
 
 logs-mongodb:
-	docker compose logs -f mongodb
+	$(DOCKER_COMPOSE) logs -f mongodb
 
 logs-redis:
-	docker compose logs -f redis
+	$(DOCKER_COMPOSE) logs -f redis
 
 logs-qdrant:
-	docker compose logs -f qdrant
+	$(DOCKER_COMPOSE) logs -f qdrant
 
 logs-postgresql:
-	docker compose logs -f postgresql
+	$(DOCKER_COMPOSE) logs -f postgresql
 
 # Pull latest images
 pull:
-	docker compose pull
+	$(DOCKER_COMPOSE) pull
 
 # Build and start (if you have custom builds)
 build:
-	docker compose up -d --build
+	$(DOCKER_COMPOSE) up -d --build
 
 # Create external Docker network from .env
 create-network:
@@ -67,4 +100,4 @@ create-network:
 
 # Check status
 status:
-	docker compose ps
+	$(DOCKER_COMPOSE) ps
