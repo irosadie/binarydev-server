@@ -18,7 +18,7 @@ services:
       - "--certificatesresolvers.letsresolver.acme.storage=/letsencrypt/acme.json"
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=${NETWORK_NAME:-binarydev}"
+      - "--providers.docker.network=${NETWORK_NAME}"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
       - "--accesslog=true"
@@ -30,7 +30,7 @@ services:
       - ./data/traefik:/letsencrypt
       - ./logs/traefik:/logs
     networks:
-      - ${NETWORK_NAME:-binarydev}
+      - ${NETWORK_NAME}
     labels:
       - "traefik.enable=false"
     healthcheck:
@@ -52,7 +52,7 @@ services:
       - ./config/mongodb:/data/configdb
       - ./logs/mongodb:/var/log/mongodb
     networks:
-      - ${NETWORK_NAME:-binarydev}
+      - ${NETWORK_NAME}
     ports:
       - "${MONGO_DB_PORT:-27017}:27017"
     labels:
@@ -76,7 +76,7 @@ services:
     volumes:
       - ./data/redis:/data
     networks:
-      - ${NETWORK_NAME:-binarydev}
+      - ${NETWORK_NAME}
     labels:
       - "traefik.enable=false"
     healthcheck:
@@ -97,7 +97,7 @@ services:
     volumes:
       - ./data/qdrant:/qdrant/storage
     networks:
-      - ${NETWORK_NAME:-binarydev}
+      - ${NETWORK_NAME}
     labels:
       - "traefik.enable=false"
     healthcheck:
@@ -123,7 +123,7 @@ services:
       - ./config/postgresql/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./config/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     networks:
-      - ${NETWORK_NAME:-binarydev}
+      - ${NETWORK_NAME}
     labels:
       - "traefik.enable=false"
     healthcheck:
@@ -152,6 +152,6 @@ services:
       -c effective_io_concurrency=200
 
 networks:
-  binarydev:
-    name: ${NETWORK_NAME:-binarydev}
-    driver: bridge
+  server-network:
+    name: ${NETWORK_NAME}
+    external: true

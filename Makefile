@@ -79,3 +79,20 @@ create-network:
 # Check status
 status:
 	$(DOCKER_COMPOSE) ps
+
+# Backup databases
+backup:
+	@chmod +x scripts/backup-databases.sh
+	@./scripts/backup-databases.sh all
+
+backup-postgresql:
+	@chmod +x scripts/backup-databases.sh
+	@./scripts/backup-databases.sh postgresql
+
+backup-mongodb:
+	@chmod +x scripts/backup-databases.sh
+	@./scripts/backup-databases.sh mongodb
+
+backup-redis:
+	@chmod +x scripts/backup-databases.sh
+	@./scripts/backup-databases.sh redis

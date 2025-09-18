@@ -25,6 +25,32 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Safety backup function
+backup_database() {
+    local service=$1
+    local backup_dir="backups/$(date +%Y%m%d_%H%M%S)"
+    
+    print_status "Creating safety backup directory: ${backup_dir}"
+    mkdir -p "${backup_dir}"
+    
+    case $service in
+        "postgresql")
+            if docker exec postgresql pg_isready -U ${POSTGRES_USER} >/dev/null 2>&1; then
+                print_status "Backing up PostgreSQL database..."
+                docker exec postgresql pg_dumpall -U ${POSTGRES_USER} > "${backup_dir}/postgresql_backup.sql"
+                print_success "PostgreSQL backup saved to ${backup_dir}/postgresql_backup.sql"
+            fi
+            ;;
+        "mongodb")
+            if docker exec mongodb mongosh --quiet --eval "db.runCommand('ping').ok" >/dev/null 2>&1; then
+                print_status "Backing up MongoDB database..."
+                docker exec mongodb mongodump --out "/data/backup_${backup_dir##*/}"
+                print_success "MongoDB backup saved inside container"
+            fi
+            ;;
+    esac
+}
+
 # Check if .env file exists
 if [ ! -f .env ]; then
     print_error ".env file not found!"
@@ -55,14 +81,49 @@ if ! docker info > /dev/null 2>&1; then
 fi
 print_success "Docker is running"
 
+# Network management function
+setup_network() {
+    local network_name=$1
+    
+    print_status "Setting up Docker network: ${network_name}"
+    
+    # Check if network exists
+    if docker network ls --format "{{.Name}}" | grep -q "^${network_name}$"; then
+        print_success "Network ${network_name} already exists"
+        
+        # Verify network is accessible
+        if docker network inspect ${network_name} >/dev/null 2>&1; then
+            print_status "Network ${network_name} is accessible"
+        else
+            print_warning "Network ${network_name} exists but has issues"
+            print_status "Attempting to recreate network..."
+            docker network rm ${network_name} >/dev/null 2>&1
+            if docker network create --driver bridge ${network_name} >/dev/null 2>&1; then
+                print_success "Network ${network_name} recreated successfully"
+            else
+                print_error "Failed to recreate network ${network_name}"
+                exit 1
+            fi
+        fi
+    else
+        # Create new network
+        if docker network create --driver bridge ${network_name} >/dev/null 2>&1; then
+            print_success "Network ${network_name} created successfully"
+        else
+            print_error "Failed to create network ${network_name}"
+            exit 1
+        fi
+    fi
+}
+
 # Create network if it doesn't exist
-print_status "Setting up Docker network..."
-docker network create ${NETWORK_NAME} 2>/dev/null && print_success "Network ${NETWORK_NAME} created" || print_warning "Network ${NETWORK_NAME} already exists"
+setup_network ${NETWORK_NAME}
 
 # Create necessary directories
 print_status "Creating data directories..."
-mkdir -p data/{mongodb,redis,qdrant,postgresql}
-mkdir -p logs
+mkdir -p data/{mongodb,redis,qdrant,postgresql,traefik}
+mkdir -p logs/{mongodb,traefik}
+mkdir -p backups
 print_success "Directories created"
 
 # Set proper permissions for PostgreSQL configuration files
@@ -97,17 +158,29 @@ print_status "Checking PostgreSQL configuration..."
 if docker ps -q -f name=postgresql >/dev/null 2>&1; then
     print_warning "PostgreSQL container exists, checking for lc_collate issues..."
     if docker logs postgresql 2>&1 | grep -q "unrecognized configuration parameter.*lc_collate"; then
-        print_warning "Found lc_collate error, fixing PostgreSQL..."
-        ${DOCKER_COMPOSE} stop postgresql
-        print_status "Removing problematic PostgreSQL data..."
-        rm -rf data/postgresql
-        mkdir -p data/postgresql
-        print_success "PostgreSQL reset complete"
+        print_error "Found lc_collate error in PostgreSQL!"
+        print_warning "This usually happens with configuration conflicts."
+        print_warning "To fix this issue:"
+        print_warning "  1. Stop services: make down"
+        print_warning "  2. Check PostgreSQL logs: docker logs postgresql"
+        print_warning "  3. If needed, backup data first: docker exec postgresql pg_dumpall -U ${POSTGRES_USER} > backup.sql"
+        print_warning "  4. Only if safe, remove data: rm -rf data/postgresql/*"
+        print_warning "  5. Restart: make start"
+        print_error "Automatic data deletion is disabled for safety. Please fix manually."
+        print_status "Continuing with other services..."
     fi
 fi
 
 # Start services
 print_status "Starting all services..."
+
+# Final network check before starting services
+if ! docker network inspect ${NETWORK_NAME} >/dev/null 2>&1; then
+    print_error "Network ${NETWORK_NAME} is not available. Cannot start services."
+    print_status "Try running: make create-network"
+    exit 1
+fi
+
 ${DOCKER_COMPOSE} up -d
 
 # Wait for services to be ready
@@ -173,4 +246,13 @@ echo "   - Check PostgreSQL logs: docker logs postgresql"
 echo "   - Test connection: docker exec postgresql psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c 'SELECT version();'"
 echo "   - Check firewall: sudo ufw status"
 echo "   - Check Docker networks: docker network ls"
+echo "   - Inspect network: docker network inspect ${NETWORK_NAME}"
+echo "   - Recreate network: make down && docker network rm ${NETWORK_NAME} && make create-network && make start"
 echo "   - Test port: nc -zv ${SERVER_IP} ${POSTGRES_PORT}"
+echo ""
+print_status "🛡️ Safety commands (ALWAYS backup first):"
+echo "   - Backup all: make backup"
+echo "   - Backup PostgreSQL: make backup-postgresql"
+echo "   - Backup MongoDB: make backup-mongodb"
+echo "   - List backups: ls -la backups/"
+echo "   - Restore PostgreSQL: cat backup.sql | docker exec -i postgresql psql -U ${POSTGRES_USER}"
