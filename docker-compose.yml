@@ -152,6 +152,6 @@ services:
       -c effective_io_concurrency=200
 
 networks:
-  server-network:
+  binarydev:
     name: ${NETWORK_NAME}
     external: true
