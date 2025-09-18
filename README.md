@@ -155,7 +155,7 @@ docker exec redis redis-cli -a $REDIS_PASSWORD ping
 psql -h localhost -U binarydev -d binarydb
 
 # MongoDB
-mongosh mongodb://binarydev:password@localhost:27017/binarydb
+mongosh mongodb://binarydev:password@localhost:27017/binarydb?authSource=admin
 
 # Redis
 redis-cli -h localhost -p 6379 -a password
