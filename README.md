@@ -51,6 +51,7 @@ make start
 | PostgreSQL | 5432 | Primary relational database    | ✅ Healthy   |
 | MongoDB    | 27017| NoSQL document database        | ✅ Healthy   |
 | Redis      | 6379 | In-memory cache & session store| ✅ Healthy   |
+| BullMQ Board | 3001 | Queue monitoring dashboard   | ✅ Healthy   |
 | Qdrant     | 6333 | Vector database for AI/ML      | ⚠️ API Key   |
 | Traefik    | 8080 | Reverse proxy & load balancer  | ⚠️ Config    |
 
@@ -78,6 +79,9 @@ MONGO_DB_PORT=27017
 # Redis - Cache & Sessions
 REDIS_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
 REDIS_PORT=6379
+
+# BullMQ Board - Queue Monitoring
+BULLMQ_BOARD_PORT=3001
 
 # Qdrant - Vector Database
 QDRANT_PORT=6333
@@ -110,6 +114,11 @@ QDRANT_API_KEY=CHANGE_THIS_API_KEY
 - Port: `6333`
 - API Key: Sesuai .env
 
+**BullMQ Board (Queue Monitoring)**
+- URL Local: `http://localhost:3001`
+- URL Production: `https://bullmq.yourdomain.com`
+- Monitoring: Real-time queue status, jobs, and workers
+
 ## 🛠️ Management Commands
 
 ```bash
@@ -123,9 +132,14 @@ make down
 make logs
 make logs-postgresql
 make logs-mongodb
+make logs-bullmq
 
 # Check status
 make status
+
+# BullMQ specific
+make bullmq-ui          # Open BullMQ dashboard
+make restart-bullmq     # Restart BullMQ service
 
 # Clean restart (removes all data)
 make down-clean
@@ -161,7 +175,158 @@ mongosh mongodb://binarydev:password@localhost:27017/binarydb?authSource=admin
 redis-cli -h localhost -p 6379 -a password
 
 # Qdrant
+**Qdrant**
 curl -H "api-key: your_api_key" http://localhost:6333/health
+```
+
+## 📦 BullMQ Queue Management
+
+### Overview
+BullMQ adalah powerful queue library untuk Node.js yang menggunakan Redis sebagai backend. Service `bullmq-board` menyediakan web UI untuk monitoring dan management.
+
+### Access BullMQ Board
+- **Local**: http://localhost:3001
+- **Production**: https://bullmq.yourdomain.com (via Traefik)
+- **Quick Open**: `make bullmq-ui`
+
+### Setup dalam Next.js/Node.js Application
+
+```bash
+# Install dependencies
+npm install bullmq
+# atau
+yarn add bullmq
+```
+
+### Example Implementation
+
+**1. Queue Configuration (lib/queue.ts)**
+```typescript
+import { Queue, Worker, QueueEvents } from 'bullmq';
+
+const connection = {
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD,
+};
+
+// Create Queue
+export const emailQueue = new Queue('email', { connection });
+export const notificationQueue = new Queue('notification', { connection });
+
+// Add Job
+export async function sendEmail(to: string, subject: string, body: string) {
+  await emailQueue.add('send-email', {
+    to,
+    subject,
+    body,
+    timestamp: new Date().toISOString(),
+  });
+}
+```
+
+**2. Worker Implementation (workers/email.worker.ts)**
+```typescript
+import { Worker } from 'bullmq';
+
+const connection = {
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD,
+};
+
+const emailWorker = new Worker(
+  'email',
+  async (job) => {
+    console.log('Processing email job:', job.id);
+    const { to, subject, body } = job.data;
+    
+    // Your email sending logic here
+    await sendEmailViaProvider(to, subject, body);
+    
+    return { success: true, sentAt: new Date().toISOString() };
+  },
+  { connection }
+);
+
+emailWorker.on('completed', (job) => {
+  console.log(`Job ${job.id} completed successfully`);
+});
+
+emailWorker.on('failed', (job, err) => {
+  console.error(`Job ${job?.id} failed with error:`, err);
+});
+```
+
+**3. Queue Events (for monitoring)**
+```typescript
+import { QueueEvents } from 'bullmq';
+
+const queueEvents = new QueueEvents('email', { connection });
+
+queueEvents.on('completed', ({ jobId }) => {
+  console.log(`Email job ${jobId} completed`);
+});
+
+queueEvents.on('failed', ({ jobId, failedReason }) => {
+  console.log(`Email job ${jobId} failed:`, failedReason);
+});
+```
+
+**4. API Route Example (Next.js)**
+```typescript
+// app/api/send-email/route.ts
+import { sendEmail } from '@/lib/queue';
+
+export async function POST(request: Request) {
+  const { to, subject, body } = await request.json();
+  
+  try {
+    await sendEmail(to, subject, body);
+    return Response.json({ 
+      success: true, 
+      message: 'Email queued successfully' 
+    });
+  } catch (error) {
+    return Response.json({ 
+      success: false, 
+      error: 'Failed to queue email' 
+    }, { status: 500 });
+  }
+}
+```
+
+### BullMQ Board Features
+
+- 📊 **Real-time Monitoring**: View active, completed, failed jobs
+- 🔄 **Job Management**: Retry, remove, or pause jobs
+- 📈 **Statistics**: Queue metrics and performance data
+- 🔍 **Job Details**: Inspect job data and logs
+- ⚡ **Multiple Queues**: Monitor all queues in one dashboard
+
+### Common Use Cases
+
+1. **Email Sending**: Queue email deliveries
+2. **Image Processing**: Resize, compress images
+3. **Data Export**: Generate reports asynchronously
+4. **Notifications**: Send push notifications
+5. **Scheduled Tasks**: Run periodic jobs
+6. **Webhook Processing**: Handle webhook payloads
+
+### Monitoring & Debugging
+
+```bash
+# View BullMQ logs
+make logs-bullmq
+
+# Restart if needed
+make restart-bullmq
+
+# Check Redis connection
+docker exec redis redis-cli -a [password] ping
+```
+
+## 🔒 Security Features
 ```
 
 ## 🔒 Security Features

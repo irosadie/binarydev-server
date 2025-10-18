@@ -6,7 +6,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"  # Traefik dashboard
+      - "8080:8080" # Traefik dashboard
     command:
       - "--api.dashboard=true"
       - "--api.insecure=true"
@@ -72,7 +72,12 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-password}
-    command: ["sh", "-c", "redis-server --appendonly yes --requirepass \"$REDIS_PASSWORD\" --bind 0.0.0.0 --protected-mode yes"]
+    command:
+      [
+        "sh",
+        "-c",
+        'redis-server --appendonly yes --requirepass "$REDIS_PASSWORD" --bind 0.0.0.0 --protected-mode yes',
+      ]
     volumes:
       - ./data/redis:/data
     networks:
@@ -84,6 +89,44 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+
+  bullmq-board:
+    image: deadly0/bull-board:latest
+    container_name: bullmq-board
+    restart: unless-stopped
+    ports:
+      - "${BULLMQ_BOARD_PORT:-3001}:3000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-password}
+      - REDIS_USE_TLS=false
+      - BULL_PREFIX=bull
+    networks:
+      - ${NETWORK_NAME:-binarydev}
+    depends_on:
+      redis:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bullmq.rule=Host(`bullmq.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.bullmq.loadbalancer.server.port=3000"
+      - "traefik.http.routers.bullmq.entrypoints=websecure"
+      - "traefik.http.routers.bullmq.tls.certresolver=letsresolver"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -127,7 +170,11 @@ services:
     labels:
       - "traefik.enable=false"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-binarydev} -d ${POSTGRES_DB:-binarydb} -h localhost"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-binarydev} -d ${POSTGRES_DB:-binarydb} -h localhost",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

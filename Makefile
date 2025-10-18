@@ -80,6 +80,23 @@ create-network:
 status:
 	$(DOCKER_COMPOSE) ps
 
+# BullMQ specific commands
+logs-bullmq:
+	@$(DOCKER_COMPOSE) logs -f bullmq-board
+
+restart-bullmq:
+	@$(DOCKER_COMPOSE) restart bullmq-board
+
+bullmq-ui:
+	@echo "🎯 Opening BullMQ Board UI..."
+	@if [ -f .env ]; then \
+		PORT=$$(grep '^BULLMQ_BOARD_PORT=' .env | cut -d'=' -f2); \
+		PORT=$${PORT:-3001}; \
+		open http://localhost:$$PORT 2>/dev/null || xdg-open http://localhost:$$PORT 2>/dev/null || echo "Please open: http://localhost:$$PORT"; \
+	else \
+		echo "Please open: http://localhost:3001"; \
+	fi
+
 # Backup databases
 backup:
 	@chmod +x scripts/backup-databases.sh
