@@ -97,6 +97,23 @@ bullmq-ui:
 		echo "Please open: http://localhost:3001"; \
 	fi
 
+# RabbitMQ specific commands
+logs-rabbitmq:
+	@$(DOCKER_COMPOSE) logs -f rabbitmq
+
+restart-rabbitmq:
+	@$(DOCKER_COMPOSE) restart rabbitmq
+
+rabbitmq-ui:
+	@echo "🐰 Opening RabbitMQ Management UI..."
+	@if [ -f .env ]; then \
+		PORT=$$(grep '^RABBITMQ_MANAGEMENT_PORT=' .env | cut -d'=' -f2); \
+		PORT=$${PORT:-15672}; \
+		open http://localhost:$$PORT 2>/dev/null || xdg-open http://localhost:$$PORT 2>/dev/null || echo "Please open: http://localhost:$$PORT"; \
+	else \
+		echo "Please open: http://localhost:15672"; \
+	fi
+
 # Backup databases
 backup:
 	@chmod +x scripts/backup-databases.sh

@@ -8,12 +8,14 @@ data/mongodb/
 data/postgresql/
 data/redis/
 data/qdrant/
+data/rabbitmq/
 data/traefik/
 !data/.gitkeep
 !data/*/.gitkeep
 
 # Log files
 logs/mongodb/
+logs/rabbitmq/
 logs/traefik/
 !logs/.gitkeep
 !logs/*/.gitkeep

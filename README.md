@@ -39,6 +39,8 @@ sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw allow 5432/tcp  # PostgreSQL (jika perlu remote access)
 sudo ufw allow 27017/tcp # MongoDB (jika perlu remote access)
+sudo ufw allow 5672/tcp  # RabbitMQ AMQP (jika perlu remote access)
+sudo ufw allow 15672/tcp # RabbitMQ Management UI (optional, gunakan SSH tunnel lebih aman)
 
 # 4. Start services
 make start
@@ -51,6 +53,7 @@ make start
 | PostgreSQL | 5432 | Primary relational database    | ✅ Healthy   |
 | MongoDB    | 27017| NoSQL document database        | ✅ Healthy   |
 | Redis      | 6379 | In-memory cache & session store| ✅ Healthy   |
+| RabbitMQ   | 5672 / 15672 | Message broker & management UI | ✅ Healthy   |
 | BullMQ Board | 3001 | Queue monitoring dashboard   | ✅ Healthy   |
 | Qdrant     | 6333 | Vector database for AI/ML      | ⚠️ API Key   |
 | Traefik    | 8080 | Reverse proxy & load balancer  | ⚠️ Config    |
@@ -79,6 +82,13 @@ MONGO_DB_PORT=27017
 # Redis - Cache & Sessions
 REDIS_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
 REDIS_PORT=6379
+
+# RabbitMQ - Message Broker
+RABBITMQ_USER=binarydev
+RABBITMQ_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
+RABBITMQ_VHOST=binarydev
+RABBITMQ_PORT=5672
+RABBITMQ_MANAGEMENT_PORT=15672
 
 # BullMQ Board - Queue Monitoring
 BULLMQ_BOARD_PORT=3001
@@ -109,6 +119,15 @@ QDRANT_API_KEY=CHANGE_THIS_API_KEY
 - Port: `6379`
 - Password: Sesuai .env
 
+**RabbitMQ (Message Broker)**
+- Host: `localhost` atau `your-server-ip`
+- AMQP Port: `5672`
+- Management UI: `15672`
+- Username: `binarydev`
+- Password: Sesuai .env
+- Virtual Host: `binarydev`
+- Management URL: `http://localhost:15672`
+
 **Qdrant (Vector DB)**
 - Host: `localhost` atau `your-server-ip`
 - Port: `6333`
@@ -132,7 +151,12 @@ make down
 make logs
 make logs-postgresql
 make logs-mongodb
+make logs-rabbitmq
 make logs-bullmq
+
+# Open Management UIs
+make rabbitmq-ui    # Open RabbitMQ Management at http://localhost:15672
+make bullmq-ui      # Open BullMQ Board at http://localhost:3001
 
 # Check status
 make status
@@ -326,7 +350,256 @@ make restart-bullmq
 docker exec redis redis-cli -a [password] ping
 ```
 
-## 🔒 Security Features
+## � RabbitMQ Message Broker
+
+### Overview
+RabbitMQ adalah message broker yang mendukung berbagai messaging protocols. Cocok untuk microservices communication, event-driven architecture, dan asynchronous processing.
+
+### Access RabbitMQ
+
+**Management UI**
+- **Local**: http://localhost:15672
+- **Production**: https://rabbitmq.yourdomain.com
+- **Username**: `binarydev` (sesuai .env)
+- **Password**: Sesuai `RABBITMQ_PASSWORD` di .env
+- **Default vHost**: `binarydev`
+
+**AMQP Connection**
+- **Port**: 5672
+- **Connection String**: `amqp://binarydev:password@localhost:5672/binarydev`
+
+### Quick Start Integration
+
+**1. Install AMQP Client**
+
+```bash
+# Using amqplib (Node.js)
+npm install amqplib
+# or
+pnpm add amqplib
+
+# TypeScript types
+npm install --save-dev @types/amqplib
+```
+
+**2. Connection Setup (lib/rabbitmq.ts)**
+
+```typescript
+import amqp from 'amqplib';
+
+const RABBITMQ_URL = process.env.RABBITMQ_URL || 
+  'amqp://binarydev:B1n4ryd3vc01d@localhost:5672/binarydev';
+
+let connection: amqp.Connection | null = null;
+let channel: amqp.Channel | null = null;
+
+export async function connectRabbitMQ() {
+  try {
+    connection = await amqp.connect(RABBITMQ_URL);
+    channel = await connection.createChannel();
+    console.log('✅ RabbitMQ connected');
+    return channel;
+  } catch (error) {
+    console.error('❌ RabbitMQ connection failed:', error);
+    throw error;
+  }
+}
+
+export function getChannel() {
+  if (!channel) {
+    throw new Error('RabbitMQ channel not initialized');
+  }
+  return channel;
+}
+
+export async function closeRabbitMQ() {
+  await channel?.close();
+  await connection?.close();
+}
+```
+
+**3. Publisher Example (lib/publisher.ts)**
+
+```typescript
+import { getChannel, connectRabbitMQ } from './rabbitmq';
+
+export async function publishMessage(
+  queue: string,
+  message: any,
+  options?: amqp.Options.Publish
+) {
+  const channel = getChannel();
+  
+  // Ensure queue exists
+  await channel.assertQueue(queue, { durable: true });
+  
+  // Publish message
+  const sent = channel.sendToQueue(
+    queue,
+    Buffer.from(JSON.stringify(message)),
+    { persistent: true, ...options }
+  );
+  
+  if (sent) {
+    console.log(`📤 Message sent to queue: ${queue}`);
+  }
+  
+  return sent;
+}
+
+// Example: Send email notification
+export async function sendEmailNotification(data: {
+  to: string;
+  subject: string;
+  body: string;
+}) {
+  await publishMessage('email-queue', data);
+}
+```
+
+**4. Consumer Example (workers/email-worker.ts)**
+
+```typescript
+import { getChannel, connectRabbitMQ } from '@/lib/rabbitmq';
+
+async function startEmailWorker() {
+  await connectRabbitMQ();
+  const channel = getChannel();
+  
+  const queue = 'email-queue';
+  await channel.assertQueue(queue, { durable: true });
+  
+  // Set prefetch to 1 for fair dispatch
+  channel.prefetch(1);
+  
+  console.log(`⏳ Waiting for messages in ${queue}`);
+  
+  channel.consume(queue, async (msg) => {
+    if (!msg) return;
+    
+    try {
+      const data = JSON.parse(msg.content.toString());
+      console.log('📧 Processing email:', data);
+      
+      // Process email sending logic here
+      await sendEmail(data.to, data.subject, data.body);
+      
+      // Acknowledge message
+      channel.ack(msg);
+      console.log('✅ Email sent successfully');
+      
+    } catch (error) {
+      console.error('❌ Error processing message:', error);
+      // Reject and requeue
+      channel.nack(msg, false, true);
+    }
+  });
+}
+
+startEmailWorker();
+```
+
+**5. Next.js API Route Example**
+
+```typescript
+// app/api/notify/route.ts
+import { sendEmailNotification } from '@/lib/publisher';
+
+export async function POST(request: Request) {
+  const { to, subject, body } = await request.json();
+  
+  try {
+    await sendEmailNotification({ to, subject, body });
+    
+    return Response.json({ 
+      success: true, 
+      message: 'Notification queued' 
+    });
+  } catch (error) {
+    return Response.json({ 
+      success: false, 
+      error: 'Failed to queue notification' 
+    }, { status: 500 });
+  }
+}
+```
+
+### RabbitMQ vs BullMQ
+
+| Feature | RabbitMQ | BullMQ |
+|---------|----------|--------|
+| **Backend** | Erlang-based broker | Redis-based |
+| **Protocol** | AMQP, MQTT, STOMP | Redis protocol |
+| **Use Case** | Complex routing, microservices | Simple queues, Node.js focus |
+| **Reliability** | High (clustering, persistence) | Good (Redis persistence) |
+| **UI** | Full management console | Monitoring dashboard only |
+| **Learning Curve** | Steeper | Easier for Node.js devs |
+
+### Management UI Features
+
+- 📊 **Overview**: Connections, channels, queues statistics
+- 📬 **Queues**: Create, delete, purge queues
+- 🔄 **Exchanges**: Configure message routing
+- 👥 **Users**: Manage users and permissions
+- 🌐 **Virtual Hosts**: Isolate environments
+- 📈 **Metrics**: Real-time performance monitoring
+
+### Common Patterns
+
+**1. Work Queue (Task Distribution)**
+```typescript
+// Multiple workers process tasks from same queue
+await channel.assertQueue('tasks', { durable: true });
+```
+
+**2. Pub/Sub (Fanout)**
+```typescript
+// Broadcast messages to multiple subscribers
+await channel.assertExchange('logs', 'fanout', { durable: false });
+```
+
+**3. Routing (Direct)**
+```typescript
+// Route messages based on routing key
+await channel.assertExchange('direct_logs', 'direct', { durable: false });
+```
+
+**4. Topics (Pattern Matching)**
+```typescript
+// Route with wildcard patterns
+await channel.assertExchange('topic_logs', 'topic', { durable: false });
+```
+
+### Monitoring & Debugging
+
+```bash
+# View RabbitMQ logs
+make logs-rabbitmq
+
+# Restart RabbitMQ
+make restart-rabbitmq
+
+# Open Management UI
+make rabbitmq-ui
+
+# Check RabbitMQ status
+docker exec rabbitmq rabbitmqctl status
+
+# List queues
+docker exec rabbitmq rabbitmqctl list_queues
+
+# List connections
+docker exec rabbitmq rabbitmqctl list_connections
+```
+
+### Environment Variables
+
+Add to your `.env`:
+```bash
+RABBITMQ_URL=amqp://binarydev:B1n4ryd3vc01d@localhost:5672/binarydev
+```
+
+## �🔒 Security Features
 ```
 
 ## 🔒 Security Features
