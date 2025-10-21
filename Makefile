@@ -41,12 +41,7 @@ logs:
 logs-mongodb:
 	$(DOCKER_COMPOSE) logs -f mongodb
 
-# MongoDB Replica Set commands
-mongodb-init-replica:
-	@echo "🔧 Initializing MongoDB Replica Set..."
-	@chmod +x scripts/init-mongodb-replica.sh
-	@./scripts/init-mongodb-replica.sh
-
+# MongoDB Replica Set commands (auto-initialized on startup!)
 mongodb-status:
 	@echo "📊 MongoDB Replica Set Status:"
 	@docker exec mongodb mongosh -u $$(grep '^MONGO_INITDB_ROOT_USERNAME=' .env | cut -d'=' -f2) \
@@ -62,7 +57,7 @@ mongodb-config:
 mongodb-shell:
 	@docker exec -it mongodb mongosh -u $$(grep '^MONGO_INITDB_ROOT_USERNAME=' .env | cut -d'=' -f2) \
 		-p $$(grep '^MONGO_INITDB_ROOT_PASSWORD=' .env | cut -d'=' -f2) \
-		--authenticationDatabase admin
+		--authenticationDatabase admin $$(grep '^MONGO_INITDB_DATABASE=' .env | cut -d'=' -f2)
 
 logs-redis:
 	$(DOCKER_COMPOSE) logs -f redis

@@ -49,28 +49,19 @@ services:
     container_name: mongodb
     hostname: mongodb
     restart: unless-stopped
-    user: root # Need root to fix permissions, then switch to mongodb user
+    user: root
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-binarydev}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-binarydb}
       - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
     entrypoint: ["/usr/local/bin/mongodb-entrypoint-wrapper.sh"]
-    command:
-      [
-        "mongod",
-        "--replSet",
-        "${MONGO_REPLICA_SET_NAME:-rs0}",
-        "--bind_ip_all",
-        "--keyFile",
-        "/data/keyfile/mongodb-keyfile",
-      ]
     volumes:
       - ./data/mongodb:/data/db
-      - ./config/mongodb:/data/keyfile
+      - ./config/mongodb:/data/configdb
+      - ./config/mongodb/mongodb-keyfile:/data/keyfile/mongodb-keyfile
       - ./logs/mongodb:/var/log/mongodb
       - ./scripts/mongodb-entrypoint.sh:/usr/local/bin/mongodb-entrypoint-wrapper.sh:ro
-      - ./scripts/init-replica.sh:/docker-entrypoint-initdb.d/init-replica.sh:ro
     networks:
       - ${NETWORK_NAME:-binarydev}
     ports:
@@ -80,12 +71,15 @@ services:
     healthcheck:
       test:
         [
-          "CMD-SHELL",
-          'mongosh --quiet -u ${MONGO_INITDB_ROOT_USERNAME:-binarydev} -p ${MONGO_INITDB_ROOT_PASSWORD:-password} --authenticationDatabase admin --eval "db.runCommand(''ping'').ok" | grep 1',
+          "CMD",
+          "mongosh",
+          "--quiet",
+          "--eval",
+          "db.runCommand('ping').ok"
         ]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 60s
 
   redis:

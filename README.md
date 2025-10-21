@@ -220,21 +220,29 @@ MongoDB dikonfigurasi sebagai **Replica Set** (bukan standalone) untuk mendukung
 **Replica Set Name**: `rs0` (default)
 **Member**: Single node (development) - dapat di-expand untuk production
 
-### Setup & Initialization
+### 🚀 Zero-Configuration Setup
 
-#### 1. First Time Setup
+MongoDB Replica Set **otomatis di-initialize** saat startup! Tidak perlu manual commands.
+
+#### Quick Start (Fully Automated!)
 ```bash
-# Start MongoDB
+# Start MongoDB - Auto-initializes replica set!
 make start
 
-# Wait for MongoDB to be healthy (check with: docker-compose ps)
-# Then initialize replica set
-make mongodb-init-replica
+# Wait 60 seconds for full initialization
+# MongoDB automatically:
+# - Fixes permissions
+# - Initializes replica set (rs0)
+# - Creates admin user
+# - Creates database
+# - Ready to use!
+
+# That's it! No manual initialization needed! 🎉
 ```
 
-#### 2. Verify Replica Set
+#### Verify Setup (Optional)
 ```bash
-# Check replica set status
+# Check replica set status (should show PRIMARY)
 make mongodb-status
 
 # View configuration
