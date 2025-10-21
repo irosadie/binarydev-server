@@ -124,7 +124,19 @@ print_status "Creating data directories..."
 mkdir -p data/{mongodb,redis,qdrant,postgresql,traefik}
 mkdir -p logs/{mongodb,traefik}
 mkdir -p backups
+mkdir -p config/mongodb
 print_success "Directories created"
+
+# Generate MongoDB keyFile if not exists
+if [ ! -f config/mongodb/keyfile ]; then
+    print_status "Generating MongoDB keyFile for replica set..."
+    openssl rand -base64 756 > config/mongodb/keyfile
+    chmod 400 config/mongodb/keyfile
+    print_success "MongoDB keyFile generated"
+else
+    print_status "MongoDB keyFile already exists"
+    chmod 400 config/mongodb/keyfile 2>/dev/null || true
+fi
 
 # Set proper permissions for PostgreSQL configuration files
 print_status "Setting PostgreSQL configuration permissions..."

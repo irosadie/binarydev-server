@@ -55,6 +55,7 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
       - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
+    entrypoint: ["/docker-entrypoint.sh"]
     command:
       [
         "mongod",
@@ -63,11 +64,12 @@ services:
         "--bind_ip_all",
         "--auth",
         "--keyFile",
-        "/data/keyfile",
+        "/tmp/mongodb-keyfile",
       ]
     volumes:
       - mongodb_data:/data/db
       - ./config/mongodb/keyfile:/data/keyfile:ro
+      - ./config/mongodb/docker-entrypoint.sh:/docker-entrypoint.sh:ro
       - ./config/mongodb/init-replica.js:/docker-entrypoint-initdb.d/init-replica.js:ro
     networks:
       - ${NETWORK_NAME:-binarydev}
