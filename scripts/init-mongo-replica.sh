@@ -36,6 +36,7 @@ fi
 REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
 MONGO_USER=${MONGO_INITDB_ROOT_USERNAME:-root}
 MONGO_PASS=${MONGO_INITDB_ROOT_PASSWORD:-password}
+REPLICA_HOST=${MONGO_REPLICA_HOST:-mongodb:27017}
 MAX_RETRIES=30
 RETRY_INTERVAL=2
 
@@ -84,7 +85,7 @@ try {
     rs.initiate({
         _id: '$REPLICA_SET_NAME',
         members: [
-            { _id: 0, host: 'mongodb:27017' }
+            { _id: 0, host: '$REPLICA_HOST' }
         ]
     });
 } catch (e) {
