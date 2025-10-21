@@ -61,7 +61,6 @@ services:
         "--replSet",
         "${MONGO_REPLICA_SET_NAME:-rs0}",
         "--bind_ip_all",
-        "--auth",
       ]
     volumes:
       - ./data/mongodb:/data/db
