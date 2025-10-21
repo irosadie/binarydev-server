@@ -171,7 +171,7 @@ services:
       - "${QDRANT_PORT:-6333}:6333"
     environment:
       - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-default_api_key}
-      - QDRANT__STORAGE__PERFORM_CHECKS=false
+      # - QDRANT__STORAGE__PERFORM_CHECKS=false
     volumes:
       - ./data/qdrant:/qdrant/storage
     networks:
@@ -179,7 +179,11 @@ services:
     labels:
       - "traefik.enable=false"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q --tries=1 --spider http://localhost:6333/readyz || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
