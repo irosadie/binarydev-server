@@ -13,9 +13,11 @@ try {
   // Not yet initiated; proceed with initialization
   const rsName = process.env.MONGO_REPLICA_SET_NAME || 'rs0';
   print(`Initializing replica set '${rsName}'...`);
+  // Prefer container DNS name for stability across hosts
+  const memberHost = _getEnv('MONGO_RS_MEMBER_HOST') || 'mongodb:27017';
   rs.initiate({
     _id: rsName,
-    members: [{ _id: 0, host: 'localhost:27017' }],
+    members: [{ _id: 0, host: memberHost }],
   });
 
   // Wait until PRIMARY
@@ -37,15 +39,23 @@ try {
   const user = _getEnv('MONGO_INITDB_ROOT_USERNAME');
   const pass = _getEnv('MONGO_INITDB_ROOT_PASSWORD');
   if (user && pass) {
-    print('Creating admin user...');
-    db.getSiblingDB('admin').createUser({
-      user: user,
-      pwd: pass,
-      roles: [
-        { role: 'root', db: 'admin' },
-      ],
-    });
-    print('Admin user created.');
+    try {
+      print('Creating admin user...');
+      db.getSiblingDB('admin').createUser({
+        user: user,
+        pwd: pass,
+        roles: [
+          { role: 'root', db: 'admin' },
+        ],
+      });
+      print('Admin user created.');
+    } catch (e2) {
+      if (e2.codeName === 'DuplicateKey' || /already exists/i.test(e2.message)) {
+        print('Admin user already exists, skipping.');
+      } else {
+        print('Warning: createUser failed: ' + e2.message);
+      }
+    }
   }
 }
 

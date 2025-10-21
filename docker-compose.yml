@@ -56,8 +56,7 @@ services:
       - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
     # Minimal single-node replica set using official entrypoint
     # The init script in /docker-entrypoint-initdb.d will rs.initiate() on first run
-    command:
-      ["--replSet", "${MONGO_REPLICA_SET_NAME:-rs0}", "--bind_ip_all"]
+    command: ["--replSet", "${MONGO_REPLICA_SET_NAME:-rs0}", "--bind_ip_all"]
     volumes:
       - ./data/mongodb:/data/db
       - ./config/mongodb/rs-init.js:/docker-entrypoint-initdb.d/rs-init.js:ro

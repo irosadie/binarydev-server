@@ -60,16 +60,19 @@ else
     echo "✅ Network ${NETWORK_NAME:-binarydev} created"
 fi
 
-# Generate MongoDB keyfile if not exists
 echo ""
-echo "🔐 Setting up MongoDB keyfile..."
-if [ ! -f config/mongodb/mongodb-keyfile ]; then
-    mkdir -p config/mongodb
-    openssl rand -base64 756 > config/mongodb/mongodb-keyfile
-    chmod 400 config/mongodb/mongodb-keyfile
-    echo "✅ MongoDB keyfile generated"
+if [ "${USE_MONGO_KEYFILE}" = "true" ]; then
+    echo "🔐 Setting up MongoDB keyfile (auth in RS)..."
+    if [ ! -f config/mongodb/mongodb-keyfile ]; then
+            mkdir -p config/mongodb
+            openssl rand -base64 756 > config/mongodb/mongodb-keyfile
+            chmod 400 config/mongodb/mongodb-keyfile
+            echo "✅ MongoDB keyfile generated"
+    else
+            echo "✅ MongoDB keyfile exists"
+    fi
 else
-    echo "✅ MongoDB keyfile exists"
+    echo "🔐 Skipping MongoDB keyfile (auth not forced at startup)."
 fi
 
 # Create necessary directories
@@ -105,7 +108,7 @@ echo "  3. View logs: make logs-mongodb"
 echo "  4. Check all services: docker compose ps"
 echo ""
 echo "🔌 Connection Strings:"
-echo "  MongoDB:    mongodb://${MONGO_INITDB_ROOT_USERNAME}:****@$(hostname -I | awk '{print $1}' || echo 'localhost'):${MONGO_DB_PORT}/binarydb?replicaSet=rs0&authSource=admin"
+echo "  MongoDB:    mongodb://${MONGO_INITDB_ROOT_USERNAME}:****@${MONGO_RS_MEMBER_HOST:-$(hostname -I | awk '{print $1}' || echo 'localhost'):${MONGO_DB_PORT}}/binarydb?replicaSet=${MONGO_REPLICA_SET_NAME:-rs0}&authSource=admin"
 echo "  PostgreSQL: postgresql://${POSTGRES_USER}:****@$(hostname -I | awk '{print $1}' || echo 'localhost'):${POSTGRES_PORT}/binarydb"
 echo "  Redis:      redis://:****@$(hostname -I | awk '{print $1}' || echo 'localhost'):${REDIS_PORT}"
 echo "  RabbitMQ:   amqp://${RABBITMQ_USER}:****@$(hostname -I | awk '{print $1}' || echo 'localhost'):${RABBITMQ_PORT}/${RABBITMQ_VHOST}"
