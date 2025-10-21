@@ -55,8 +55,6 @@ services:
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
       - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
-      # Optional: override advertised host in rs config (defaults to service name 'mongodb')
-      - MONGO_REPLICA_SET_HOST=${MONGO_REPLICA_SET_HOST:-mongodb:27017}
     command:
       [
         "mongod",
