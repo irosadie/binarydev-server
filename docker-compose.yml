@@ -47,31 +47,38 @@ services:
   mongodb:
     image: mongo:7
     container_name: mongodb
-    hostname: mongodb
     restart: unless-stopped
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-binarydev}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-root}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
-      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-binarydb}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
       - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
-    # Minimal single-node replica set using official entrypoint
-    # The init script in /docker-entrypoint-initdb.d will rs.initiate() on first run
-    command: ["--replSet", "${MONGO_REPLICA_SET_NAME:-rs0}", "--bind_ip_all"]
+      # Optional: override advertised host in rs config (defaults to service name 'mongodb')
+      - MONGO_REPLICA_SET_HOST=${MONGO_REPLICA_SET_HOST:-mongodb:27017}
+    command:
+      [
+        "mongod",
+        "--replSet",
+        "${MONGO_REPLICA_SET_NAME:-rs0}",
+        "--bind_ip_all",
+        "--auth",
+      ]
     volumes:
       - ./data/mongodb:/data/db
-      - ./config/mongodb/rs-init.js:/docker-entrypoint-initdb.d/rs-init.js:ro
+      - ./config/mongodb/init-replica.js:/docker-entrypoint-initdb.d/init-replica.js:ro
     networks:
       - ${NETWORK_NAME:-binarydev}
-    ports:
-      - "${MONGO_DB_PORT:-27017}:27017"
     labels:
       - "traefik.enable=false"
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      test:
+        ["CMD-SHELL", "mongosh --eval 'db.adminCommand({ ping: 1 })' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 60s
+      retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
