@@ -201,6 +201,19 @@ else
     print_warning "PostgreSQL not ready yet, check logs: make logs-postgresql"
 fi
 
+# Initialize MongoDB Replica Set
+print_status "Initializing MongoDB replica set..."
+if [ -f scripts/init-mongo-replica.sh ]; then
+    chmod +x scripts/init-mongo-replica.sh
+    if ./scripts/init-mongo-replica.sh; then
+        print_success "MongoDB replica set initialized"
+    else
+        print_warning "MongoDB replica set initialization had issues, check logs: make logs-mongodb"
+    fi
+else
+    print_warning "MongoDB init script not found, skipping replica set initialization"
+fi
+
 echo ""
 print_success "Services started successfully!"
 echo ""
