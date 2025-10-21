@@ -9,7 +9,8 @@ services:
       - "8080:8080" # Traefik dashboard
     command:
       - "--api.dashboard=true"
-      - "--api.insecure=true"
+      # - "--api.insecure=true"
+      - "--ping=true"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
       - "--certificatesresolvers.letsresolver.acme.httpchallenge=true"
@@ -32,9 +33,13 @@ services:
     networks:
       - ${NETWORK_NAME:-binarydev}
     labels:
-      - "traefik.enable=false"
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${WEB_DOMAIN}`)"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsresolver"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
     healthcheck:
-      test: ["CMD", "traefik", "healthcheck"]
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
       interval: 30s
       timeout: 5s
       retries: 3
