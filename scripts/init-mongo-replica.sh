@@ -34,6 +34,8 @@ if [ -f .env ]; then
 fi
 
 REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
+MONGO_USER=${MONGO_INITDB_ROOT_USERNAME:-root}
+MONGO_PASS=${MONGO_INITDB_ROOT_PASSWORD:-password}
 MAX_RETRIES=30
 RETRY_INTERVAL=2
 
@@ -41,7 +43,7 @@ print_status "Waiting for MongoDB to be ready..."
 
 # Wait for MongoDB to be accessible
 for i in $(seq 1 $MAX_RETRIES); do
-    if docker exec mongodb mongosh --quiet --eval "db.adminCommand({ ping: 1 })" >/dev/null 2>&1; then
+    if docker exec mongodb mongosh -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --quiet --eval "db.adminCommand({ ping: 1 })" >/dev/null 2>&1; then
         print_success "MongoDB is ready"
         break
     fi
@@ -57,8 +59,8 @@ done
 
 # Check if replica set is already initialized
 print_status "Checking replica set status..."
-if docker exec mongodb mongosh --quiet --eval "rs.status()" >/dev/null 2>&1; then
-    RS_NAME=$(docker exec mongodb mongosh --quiet --eval "rs.status().set" 2>/dev/null || echo "")
+if docker exec mongodb mongosh -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --quiet --eval "rs.status()" >/dev/null 2>&1; then
+    RS_NAME=$(docker exec mongodb mongosh -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --quiet --eval "rs.status().set" 2>/dev/null || echo "")
     if [ -n "$RS_NAME" ]; then
         print_success "Replica set '$RS_NAME' is already initialized"
         
@@ -69,7 +71,7 @@ if docker exec mongodb mongosh --quiet --eval "rs.status()" >/dev/null 2>&1; the
         
         # Show replica set members
         print_status "Current replica set configuration:"
-        docker exec mongodb mongosh --quiet --eval "rs.conf().members.forEach(m => print('  Member ' + m._id + ': ' + m.host))"
+        docker exec mongodb mongosh -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --quiet --eval "rs.conf().members.forEach(m => print('  Member ' + m._id + ': ' + m.host))"
         exit 0
     fi
 fi
@@ -77,7 +79,7 @@ fi
 # Replica set not initialized, initialize it now
 print_status "Replica set not initialized. Initializing replica set '$REPLICA_SET_NAME'..."
 
-INIT_RESULT=$(docker exec mongodb mongosh --quiet --eval "
+INIT_RESULT=$(docker exec mongodb mongosh -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --quiet --eval "
 try {
     rs.initiate({
         _id: '$REPLICA_SET_NAME',
@@ -97,7 +99,7 @@ if echo "$INIT_RESULT" | grep -q '"ok".*1\|"ok": 1'; then
     # Wait for replica set to stabilize
     print_status "Waiting for replica set to become PRIMARY..."
     for i in $(seq 1 15); do
-        STATE=$(docker exec mongodb mongosh --quiet --eval "rs.status().myState" 2>/dev/null || echo "0")
+        STATE=$(docker exec mongodb mongosh -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --quiet --eval "rs.status().myState" 2>/dev/null || echo "0")
         if [ "$STATE" = "1" ]; then
             print_success "Replica set is now PRIMARY and ready"
             break
@@ -107,7 +109,7 @@ if echo "$INIT_RESULT" | grep -q '"ok".*1\|"ok": 1'; then
     
     # Show final status
     print_status "Final replica set configuration:"
-    docker exec mongodb mongosh --quiet --eval "
+    docker exec mongodb mongosh -u "$MONGO_USER" -p "$MONGO_PASS" --authenticationDatabase admin --quiet --eval "
         var status = rs.status();
         print('Replica Set: ' + status.set);
         print('State: ' + (status.myState === 1 ? 'PRIMARY' : 'SECONDARY/OTHER'));
@@ -122,5 +124,5 @@ else
 fi
 
 print_success "MongoDB replica set initialization complete!"
-print_status "Connection string for apps: mongodb://mongodb:27017/YOUR_DB?replicaSet=$REPLICA_SET_NAME"
-print_status "Connection string for host: mongodb://localhost:27017/YOUR_DB?replicaSet=$REPLICA_SET_NAME&directConnection=true"
+print_status "Connection string for apps: mongodb://$MONGO_USER:$MONGO_PASS@mongodb:27017/YOUR_DB?replicaSet=$REPLICA_SET_NAME&authSource=admin"
+print_status "Connection string for host: mongodb://$MONGO_USER:$MONGO_PASS@localhost:27017/YOUR_DB?replicaSet=$REPLICA_SET_NAME&directConnection=true&authSource=admin"

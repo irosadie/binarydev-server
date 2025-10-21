@@ -51,6 +51,9 @@ services:
     ports:
       - "${MONGODB_PORT:-27017}:27017"
     environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-root}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
+      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
       - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
     command:
       [
@@ -58,10 +61,13 @@ services:
         "--replSet",
         "${MONGO_REPLICA_SET_NAME:-rs0}",
         "--bind_ip_all",
-        "--noauth",
+        "--auth",
+        "--keyFile",
+        "/data/keyfile",
       ]
     volumes:
       - mongodb_data:/data/db
+      - ./config/mongodb/keyfile:/data/keyfile:ro
       - ./config/mongodb/init-replica.js:/docker-entrypoint-initdb.d/init-replica.js:ro
     networks:
       - ${NETWORK_NAME:-binarydev}
@@ -69,7 +75,10 @@ services:
       - "traefik.enable=false"
     healthcheck:
       test:
-        ["CMD-SHELL", "mongosh --eval 'db.adminCommand({ ping: 1 })' || exit 1"]
+        [
+          "CMD-SHELL",
+          "mongosh -u ${MONGO_INITDB_ROOT_USERNAME:-root} -p ${MONGO_INITDB_ROOT_PASSWORD:-password} --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 })' || exit 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
