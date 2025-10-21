@@ -49,19 +49,18 @@ services:
     container_name: mongodb
     hostname: mongodb
     restart: unless-stopped
-    user: root
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-binarydev}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-binarydb}
       - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
-    entrypoint: ["/usr/local/bin/mongodb-entrypoint-wrapper.sh"]
+    # Minimal single-node replica set using official entrypoint
+    # The init script in /docker-entrypoint-initdb.d will rs.initiate() on first run
+    command:
+      ["--replSet", "${MONGO_REPLICA_SET_NAME:-rs0}", "--bind_ip_all", "--auth"]
     volumes:
       - ./data/mongodb:/data/db
-      - ./config/mongodb:/data/configdb
-      - ./config/mongodb/mongodb-keyfile:/data/keyfile/mongodb-keyfile
-      - ./logs/mongodb:/var/log/mongodb
-      - ./scripts/mongodb-entrypoint.sh:/usr/local/bin/mongodb-entrypoint-wrapper.sh:ro
+      - ./config/mongodb/rs-init.js:/docker-entrypoint-initdb.d/rs-init.js:ro
     networks:
       - ${NETWORK_NAME:-binarydev}
     ports:
@@ -69,7 +68,11 @@ services:
     labels:
       - "traefik.enable=false"
     healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand('ping').ok"]
+      test:
+        [
+          "CMD-SHELL",
+          'mongosh --quiet -u $$MONGO_INITDB_ROOT_USERNAME -p $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval "db.runCommand(''ping'').ok" || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
