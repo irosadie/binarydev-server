@@ -73,11 +73,12 @@ POSTGRES_USER=binarydev
 POSTGRES_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
 POSTGRES_PORT=5432
 
-# MongoDB - Document Database
+# MongoDB - Document Database (Replica Set)
 MONGO_INITDB_ROOT_USERNAME=binarydev
 MONGO_INITDB_ROOT_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
 MONGO_INITDB_DATABASE=binarydb
 MONGO_DB_PORT=27017
+MONGO_REPLICA_SET_NAME=rs0
 
 # Redis - Cache & Sessions
 REDIS_PASSWORD=CHANGE_THIS_SECURE_PASSWORD
@@ -107,12 +108,14 @@ QDRANT_API_KEY=CHANGE_THIS_API_KEY
 - Username: `binarydev`
 - Password: Sesuai .env
 
-**MongoDB (Document Store)**
+**MongoDB (Document Store - Replica Set)**
 - Host: `localhost` atau `your-server-ip`
 - Port: `27017`
 - Database: `binarydb`
 - Username: `binarydev`
 - Password: Sesuai .env
+- Replica Set: `rs0`
+- Connection String: `mongodb://binarydev:password@localhost:27017/binarydb?replicaSet=rs0&authSource=admin`
 
 **Redis (Cache)**
 - Host: `localhost` atau `your-server-ip`
@@ -201,6 +204,219 @@ redis-cli -h localhost -p 6379 -a password
 # Qdrant
 **Qdrant**
 curl -H "api-key: your_api_key" http://localhost:6333/health
+```
+
+## 🍃 MongoDB Replica Set
+
+### Overview
+MongoDB dikonfigurasi sebagai **Replica Set** (bukan standalone) untuk mendukung:
+- ✅ **Transactions**: Multi-document ACID transactions
+- ✅ **Change Streams**: Real-time data change notifications
+- ✅ **High Availability**: Automatic failover support
+- ✅ **Production Ready**: Best practice untuk deployment
+
+### Configuration
+
+**Replica Set Name**: `rs0` (default)
+**Member**: Single node (development) - dapat di-expand untuk production
+
+### Setup & Initialization
+
+#### 1. First Time Setup
+```bash
+# Start MongoDB
+make start
+
+# Wait for MongoDB to be healthy (check with: docker-compose ps)
+# Then initialize replica set
+make mongodb-init-replica
+```
+
+#### 2. Verify Replica Set
+```bash
+# Check replica set status
+make mongodb-status
+
+# View configuration
+make mongodb-config
+
+# Open MongoDB shell
+make mongodb-shell
+```
+
+### Connection Strings
+
+**Local Development:**
+```javascript
+// Node.js / Next.js
+const MONGODB_URI = "mongodb://binarydev:B1n4ryd3vc01d@localhost:27017/binarydb?replicaSet=rs0&authSource=admin";
+```
+
+**With Mongoose:**
+```javascript
+import mongoose from 'mongoose';
+
+await mongoose.connect(process.env.MONGODB_URI, {
+  replicaSet: 'rs0',
+  authSource: 'admin',
+  // Optional: specific options for replica set
+  readPreference: 'primary',
+  retryWrites: true,
+  w: 'majority'
+});
+```
+
+**MongoDB Compass:**
+```
+mongodb://binarydev:B1n4ryd3vc01d@localhost:27017/binarydb?replicaSet=rs0&authSource=admin
+```
+
+### Using Transactions
+
+```javascript
+import mongoose from 'mongoose';
+
+// Start a session
+const session = await mongoose.startSession();
+
+try {
+  // Start transaction
+  session.startTransaction();
+  
+  // Perform operations
+  await User.create([{ name: 'John' }], { session });
+  await Order.create([{ userId: 'xxx', total: 100 }], { session });
+  
+  // Commit transaction
+  await session.commitTransaction();
+  console.log('Transaction committed successfully');
+} catch (error) {
+  // Rollback on error
+  await session.abortTransaction();
+  console.error('Transaction aborted:', error);
+} finally {
+  session.endSession();
+}
+```
+
+### Using Change Streams
+
+```javascript
+import mongoose from 'mongoose';
+
+// Watch for changes on a collection
+const User = mongoose.model('User');
+const changeStream = User.watch();
+
+changeStream.on('change', (change) => {
+  console.log('Change detected:', change);
+  
+  switch (change.operationType) {
+    case 'insert':
+      console.log('New user created:', change.fullDocument);
+      break;
+    case 'update':
+      console.log('User updated:', change.documentKey);
+      break;
+    case 'delete':
+      console.log('User deleted:', change.documentKey);
+      break;
+  }
+});
+
+// Close change stream when done
+// changeStream.close();
+```
+
+### Manual Commands
+
+```bash
+# Check if replica set is initialized
+docker exec mongodb mongosh -u binarydev -p B1n4ryd3vc01d \
+  --authenticationDatabase admin --eval "rs.status()"
+
+# Get replica set configuration
+docker exec mongodb mongosh -u binarydev -p B1n4ryd3vc01d \
+  --authenticationDatabase admin --eval "rs.conf()"
+
+# Check if node is PRIMARY
+docker exec mongodb mongosh -u binarydev -p B1n4ryd3vc01d \
+  --authenticationDatabase admin --eval "db.isMaster()"
+
+# View replica set members
+docker exec mongodb mongosh -u binarydev -p B1n4ryd3vc01d \
+  --authenticationDatabase admin --eval "rs.status().members"
+```
+
+### Troubleshooting
+
+**Issue: "not master and slaveOk=false"**
+```bash
+# Solution: Make sure replica set is initialized
+make mongodb-init-replica
+```
+
+**Issue: Transactions failing**
+```bash
+# Verify replica set is PRIMARY
+make mongodb-status
+# Look for "stateStr": "PRIMARY" in output
+```
+
+**Issue: Cannot connect with replicaSet parameter**
+```bash
+# Check if replica set is initialized
+docker exec mongodb mongosh -u binarydev -p B1n4ryd3vc01d \
+  --authenticationDatabase admin --eval "rs.status()"
+
+# Re-initialize if needed
+make mongodb-init-replica
+```
+
+**Issue: Connection timeout**
+```bash
+# Check MongoDB logs
+make logs-mongodb
+
+# Restart MongoDB
+docker-compose restart mongodb
+
+# Wait 30 seconds, then initialize
+sleep 30 && make mongodb-init-replica
+```
+
+### Production Scaling
+
+Untuk production dengan multiple nodes:
+
+```yaml
+# docker-compose.yml (example for 3-node replica set)
+mongodb-primary:
+  image: mongo:7
+  command: ["--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/keyfile/mongodb-keyfile"]
+  # ... other config
+
+mongodb-secondary1:
+  image: mongo:7
+  command: ["--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/keyfile/mongodb-keyfile"]
+  # ... other config
+
+mongodb-secondary2:
+  image: mongo:7
+  command: ["--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/keyfile/mongodb-keyfile"]
+  # ... other config
+```
+
+Kemudian initialize dengan 3 members:
+```javascript
+rs.initiate({
+  _id: "rs0",
+  members: [
+    { _id: 0, host: "mongodb-primary:27017", priority: 2 },
+    { _id: 1, host: "mongodb-secondary1:27017", priority: 1 },
+    { _id: 2, host: "mongodb-secondary2:27017", priority: 1 }
+  ]
+});
 ```
 
 ## 📦 BullMQ Queue Management
@@ -627,18 +843,38 @@ Username: binarydev
 Password: your-password
 ```
 
-**MongoDB Remote Access:**
+**MongoDB Remote Access (Replica Set):**
 ```bash
-# Connection string
-mongodb://binarydev:password@your-server-ip:27017/binarydb
+# Connection string with Replica Set
+mongodb://binarydev:password@your-server-ip:27017/binarydb?replicaSet=rs0&authSource=admin
 
 # MongoDB Compass configuration
+Connection String: mongodb://binarydev:password@your-server-ip:27017/binarydb?replicaSet=rs0&authSource=admin
+
+# Or manual configuration:
 Host: your-server-ip
 Port: 27017
 Authentication: Username/Password
 Username: binarydev
 Password: your-password
 Database: binarydb
+Replica Set Name: rs0
+Authentication Database: admin
+```
+
+**MongoDB Replica Set Management:**
+```bash
+# Initialize replica set (run after first startup)
+make mongodb-init-replica
+
+# Check replica set status
+make mongodb-status
+
+# View replica set configuration
+make mongodb-config
+
+# Open MongoDB shell
+make mongodb-shell
 ```
 
 ## 📂 Directory Structure

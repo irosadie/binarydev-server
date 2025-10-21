@@ -47,15 +47,26 @@ services:
   mongodb:
     image: mongo:7
     container_name: mongodb
+    hostname: mongodb
     restart: unless-stopped
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-binarydev}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
       - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-binarydb}
-    command: ["--bind_ip_all"]
+      - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
+    command:
+      [
+        "--replSet",
+        "${MONGO_REPLICA_SET_NAME:-rs0}",
+        "--bind_ip_all",
+        "--keyFile",
+        "/data/keyfile/mongodb-keyfile",
+      ]
     volumes:
       - ./data/mongodb:/data/db
+      - ./config/mongodb:/data/keyfile:ro
       - ./logs/mongodb:/var/log/mongodb
+      - ./scripts/init-replica.sh:/docker-entrypoint-initdb.d/init-replica.sh:ro
     networks:
       - ${NETWORK_NAME:-binarydev}
     ports:
