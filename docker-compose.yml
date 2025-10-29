@@ -163,8 +163,8 @@ services:
       - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-binarydev}
       - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit log_levels [{connection,error},{default,error}] disk_free_limit 2147483648
     volumes:
-      - ./data/rabbitmq:/var/lib/rabbitmq
-      - ./logs/rabbitmq:/var/log/rabbitmq
+      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_logs:/var/log/rabbitmq
     networks:
       - ${NETWORK_NAME:-binarydev}
     labels:
@@ -217,7 +217,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
-      - ./data/postgresql:/var/lib/postgresql/data
+      - postgresql_data:/var/lib/postgresql/data
       - ./config/postgresql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - ./config/postgresql/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
       - ./config/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf:ro
@@ -261,4 +261,10 @@ networks:
 
 volumes:
   mongodb_data:
+    driver: local
+  postgresql_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  rabbitmq_logs:
     driver: local
