@@ -44,6 +44,50 @@ services:
       timeout: 5s
       retries: 3
 
+  backend:
+    image: ghcr.io/responsive-virtual-assistant/reva-backend:latest
+    container_name: backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-3000}:${BACKEND_PORT:-3000}"
+    environment:
+      # Server Configuration
+      - PORT=${BACKEND_PORT:-3000}
+            # JWT Configuration
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      
+      # Database URL (composed from individual values)
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-binarydev}:${POSTGRES_PASSWORD:-password}@postgresql:5432/${POSTGRES_DB:-binarydb}
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - ./logs/backend:/app/logs
+    networks:
+      - ${NETWORK_NAME:-binarydev}
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`api.${BACKEND_DOMAIN:-localhost}`)"
+      - "traefik.http.services.backend.loadbalancer.server.port=${BACKEND_PORT:-3000}"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsresolver"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:${BACKEND_PORT:-3000}/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
   mongodb:
     image: mongo:7
     container_name: mongodb
