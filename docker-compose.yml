@@ -52,7 +52,7 @@ services:
       - "${BACKEND_PORT:-3000}:3000"
     environment:
       # Server Configuration
-      - PORT=${BACKEND_PORT:-3000}
+      - PORT=3000
             # JWT Configuration
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
