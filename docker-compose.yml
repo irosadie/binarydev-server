@@ -69,11 +69,7 @@ services:
     depends_on:
       postgresql:
         condition: service_healthy
-      mongodb:
-        condition: service_healthy
       redis:
-        condition: service_healthy
-      rabbitmq:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
@@ -88,47 +84,40 @@ services:
       retries: 3
       start_period: 40s
 
-  mongodb:
-    image: mongo:7
-    container_name: mongodb
+
+  worker:
+    image: ghcr.io/responsive-virtual-assistant/reva-backend:latest
+    container_name: backend
     restart: unless-stopped
+    command: ["bun", "run", "worker"]
     ports:
-      - "${MONGODB_PORT:-27017}:27017"
+      - "${BACKEND_PORT:-3000}:3000"
     environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME:-root}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD:-password}
-      - MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE:-admin}
-      - MONGO_REPLICA_SET_NAME=${MONGO_REPLICA_SET_NAME:-rs0}
-    entrypoint: ["/docker-entrypoint.sh"]
-    command:
-      [
-        "mongod",
-        "--replSet",
-        "${MONGO_REPLICA_SET_NAME:-rs0}",
-        "--bind_ip_all",
-        "--auth",
-        "--keyFile",
-        "/tmp/mongodb-keyfile",
-      ]
+      # Server Configuration
+      - PORT=3000
+      # JWT Configuration
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      
+      # Database URL (composed from individual values)
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-binarydev}:${POSTGRES_PASSWORD:-password}@postgresql:5432/${POSTGRES_DB:-binarydb}
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
-      - mongodb_data:/data/db
-      - ./config/mongodb/keyfile:/data/keyfile:ro
-      - ./config/mongodb/docker-entrypoint.sh:/docker-entrypoint.sh:ro
-      - ./config/mongodb/init-replica.js:/docker-entrypoint-initdb.d/init-replica.js:ro
+      - ./logs/worker:/app/logs
     networks:
       - ${NETWORK_NAME:-binarydev}
-    labels:
-      - "traefik.enable=false"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "mongosh -u ${MONGO_INITDB_ROOT_USERNAME:-root} -p ${MONGO_INITDB_ROOT_PASSWORD:-password} --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 })' || exit 1",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   redis:
     image: redis:7-alpine
@@ -155,99 +144,6 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
-
-  bullmq-board:
-    image: deadly0/bull-board:latest
-    container_name: bullmq-board
-    restart: unless-stopped
-    ports:
-      - "${BULLMQ_BOARD_PORT:-3001}:3000"
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-password}
-      - REDIS_USE_TLS=false
-      - BULL_PREFIX=bull
-    networks:
-      - ${NETWORK_NAME:-binarydev}
-    depends_on:
-      redis:
-        condition: service_healthy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.bullmq.rule=Host(`bullmq.${DOMAIN:-localhost}`)"
-      - "traefik.http.services.bullmq.loadbalancer.server.port=3000"
-      - "traefik.http.routers.bullmq.entrypoints=websecure"
-      - "traefik.http.routers.bullmq.tls.certresolver=letsresolver"
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:3000/",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: rabbitmq
-    restart: unless-stopped
-    ports:
-      - "${RABBITMQ_PORT:-5672}:5672" # AMQP port
-      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672" # Management UI
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER:-binarydev}
-      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD:-B1n4ryd3vc01d}
-      - RABBITMQ_DEFAULT_VHOST=${RABBITMQ_VHOST:-binarydev}
-      - RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS=-rabbit log_levels [{connection,error},{default,error}] disk_free_limit 2147483648
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-      - rabbitmq_logs:/var/log/rabbitmq
-    networks:
-      - ${NETWORK_NAME:-binarydev}
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.${DOMAIN:-localhost}`)"
-      - "traefik.http.services.rabbitmq.loadbalancer.server.port=15672"
-      - "traefik.http.routers.rabbitmq.entrypoints=websecure"
-      - "traefik.http.routers.rabbitmq.tls.certresolver=letsresolver"
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: qdrant
-    restart: unless-stopped
-    ports:
-      - "${QDRANT_PORT:-6333}:6333"
-    environment:
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-default_api_key}
-      # - QDRANT__STORAGE__PERFORM_CHECKS=false
-    volumes:
-      - ./data/qdrant:/qdrant/storage
-    networks:
-      - ${NETWORK_NAME:-binarydev}
-    labels:
-      - "traefik.enable=false"
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "wget -q --tries=1 --spider http://localhost:6333/readyz || exit 1",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   postgresql:
     image: postgres:16
@@ -304,11 +200,5 @@ networks:
     external: true
 
 volumes:
-  mongodb_data:
-    driver: local
   postgresql_data:
-    driver: local
-  rabbitmq_data:
-    driver: local
-  rabbitmq_logs:
     driver: local
