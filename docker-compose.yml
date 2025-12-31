@@ -87,7 +87,7 @@ services:
 
   worker:
     image: ghcr.io/responsive-virtual-assistant/reva-backend:latest
-    container_name: backend
+    container_name: worker
     restart: unless-stopped
     command: ["bun", "run", "worker"]
     ports:
