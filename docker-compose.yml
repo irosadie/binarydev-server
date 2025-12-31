@@ -90,8 +90,6 @@ services:
     container_name: worker
     restart: unless-stopped
     command: ["bun", "run", "worker"]
-    ports:
-      - "${BACKEND_PORT:-3000}:3000"
     environment:
       # Server Configuration
       - PORT=3000
