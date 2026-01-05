@@ -15,6 +15,23 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'binarydb_test')\gexec
 -- Create extensions that might be needed
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "vector";
+
+-- Custom UUID v7 generation function
+CREATE OR REPLACE FUNCTION uuid_generate_v7()
+RETURNS uuid
+LANGUAGE plpgsql
+PARALLEL SAFE
+AS $
+  DECLARE
+    unix_time_ms CONSTANT bytea NOT NULL DEFAULT substring(int8send((extract(epoch FROM clock_timestamp()) * 1000)::bigint) from 3);
+    buffer bytea NOT NULL DEFAULT unix_time_ms || gen_random_bytes(10);
+  BEGIN
+    buffer = set_byte(buffer, 6, (b'0111' || get_byte(buffer, 6)::bit(4))::bit(8)::int);
+    buffer = set_byte(buffer, 8, (b'10'   || get_byte(buffer, 8)::bit(6))::bit(8)::int);
+    RETURN encode(buffer, 'hex')::uuid;
+  END
+$;
 
 -- Create a basic table for health checks
 CREATE TABLE IF NOT EXISTS health_check (
