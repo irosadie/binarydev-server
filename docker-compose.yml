@@ -48,6 +48,8 @@ services:
     image: ghcr.io/responsive-virtual-assistant/reva-backend:latest
     container_name: backend
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     environment:
@@ -90,6 +92,8 @@ services:
     image: ghcr.io/responsive-virtual-assistant/reva-backend:latest
     container_name: worker
     restart: unless-stopped
+    env_file:
+      - .env
     command: ["bun", "run", "worker"]
     environment:
       # Server Configuration
@@ -160,6 +164,12 @@ services:
       - --debug=true
       - --os=Chrome
       - --account-validation=false
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whatsapp.rule=Host(`${WHATSAPP_DOMAIN:-localhost}`)"
+      - "traefik.http.services.whatsapp.loadbalancer.server.port=9120"
+      - "traefik.http.routers.whatsapp.entrypoints=websecure"
+      - "traefik.http.routers.whatsapp.tls.certresolver=letsresolver"
 
   postgresql:
     image: postgres:16
