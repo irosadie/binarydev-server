@@ -9,8 +9,10 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'binarydb')\gexec
 SELECT 'CREATE DATABASE binarydb_test'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'binarydb_test')\gexec
 
+SELECT 'CREATE DATABASE revadev'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'binarydb_test')\gexec
 -- Connect to the main database
-\c binarydb;
+\c revadev;
 
 -- Create extensions that might be needed
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
