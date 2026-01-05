@@ -3,9 +3,9 @@ name: Database Backup
 on:
 #   schedule:
 #     - cron: '59 16 * * *' # Every day at 16:59 UTC // 23:59 WIB
-  push:
-    branches:
-      - master
+  # push:
+  #   branches:
+  #     - master
 
 jobs:
   backup-and-cleanup:
