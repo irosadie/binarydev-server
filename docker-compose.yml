@@ -175,7 +175,7 @@ services:
       - "traefik.http.routers.whatsapp.tls.certresolver=letsresolver"
 
   postgresql:
-    image: pgvector/pg:18
+    image: pgvector/pgvector:pg18-trixie
     container_name: postgresql
     restart: unless-stopped
     ports:
