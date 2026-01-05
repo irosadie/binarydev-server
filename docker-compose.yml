@@ -64,6 +64,7 @@ services:
 
       # Logging
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-password}@redis:6379
     volumes:
       - ./logs/backend:/app/logs
       - uploads_data:/app/uploads
@@ -101,6 +102,8 @@ services:
       # JWT Configuration
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-password}@redis:6379
       
       # Database URL (composed from individual values)
       - DATABASE_URL=postgresql://${POSTGRES_USER:-binarydev}:${POSTGRES_PASSWORD:-password}@postgresql:5432/${POSTGRES_DB:-binarydb}
