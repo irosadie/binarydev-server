@@ -173,6 +173,8 @@ services:
       - "traefik.http.services.whatsapp.loadbalancer.server.port=9120"
       - "traefik.http.routers.whatsapp.entrypoints=websecure"
       - "traefik.http.routers.whatsapp.tls.certresolver=letsresolver"
+    networks:
+      - ${NETWORK_NAME:-binarydev}
 
   postgresql:
     image: pgvector/pgvector:pg18-trixie
